@@ -1,5 +1,14 @@
 USE saas_contabilidad;
 
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    rol ENUM('admin','user') NOT NULL DEFAULT 'user',
+    estado TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS empresas (
     id INT PRIMARY KEY AUTO_INCREMENT,
     id_usuario INT NOT NULL,

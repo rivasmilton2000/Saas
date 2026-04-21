@@ -3,11 +3,13 @@ require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/controllers/DashboardController.php';
 require_once __DIR__ . '/models/EmpresaModel.php';
+require_once __DIR__ . '/models/UsuarioModel.php';
 
 requireLogin();
 
 $session = sessionData();
 $idUsuario = (int) $session['id_usuario'];
+$esAdmin = isAdmin();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_company') {
     $nombre       = trim((string) ($_POST['nombre'] ?? ''));
@@ -98,6 +100,109 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_user') {
+    if (!$esAdmin) {
+        setFlash('dashboard', 'Solo un administrador puede agregar perfiles.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $validation = UsuarioModel::validateNewUser($pdo, $_POST, true);
+
+    if (!($validation['ok'] ?? false)) {
+        setFlash('dashboard', (string) ($validation['message'] ?? 'No se pudo crear el perfil.'), 'danger', [
+            'open_user_modal' => true,
+            'user_old'        => $validation['old'] ?? [],
+        ]);
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    UsuarioModel::create($pdo, $validation['data']);
+    setFlash('dashboard', 'Perfil creado correctamente.', 'success');
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_user') {
+    if (!$esAdmin) {
+        setFlash('dashboard', 'Solo un administrador puede editar perfiles.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $editUserId = (int) ($_POST['user_id'] ?? 0);
+    if ($editUserId <= 0) {
+        setFlash('dashboard', 'Debes indicar el perfil que quieres editar.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $validation = UsuarioModel::validateUserUpdate($pdo, $editUserId, $_POST, true);
+
+    if (!($validation['ok'] ?? false)) {
+        setFlash('dashboard', (string) ($validation['message'] ?? 'No se pudo actualizar el perfil.'), 'danger', [
+            'open_edit_user_modal' => true,
+            'edit_user_old'        => $validation['old'] ?? ['id' => $editUserId],
+        ]);
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    UsuarioModel::update($pdo, $editUserId, $validation['data']);
+
+    if ($editUserId === $idUsuario) {
+        $_SESSION['username'] = $validation['data']['username'];
+        $_SESSION['rol'] = $validation['data']['rol'];
+    }
+
+    setFlash('dashboard', 'Perfil actualizado correctamente.', 'success');
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_user') {
+    if (!$esAdmin) {
+        setFlash('dashboard', 'Solo un administrador puede eliminar perfiles.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $deleteUserId = (int) ($_POST['user_id'] ?? 0);
+    if ($deleteUserId <= 0) {
+        setFlash('dashboard', 'Debes indicar el perfil que quieres eliminar.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $usuarioObjetivo = UsuarioModel::getById($pdo, $deleteUserId);
+    if ($usuarioObjetivo === null) {
+        setFlash('dashboard', 'El perfil que intentas eliminar ya no existe.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    if ($deleteUserId === $idUsuario) {
+        setFlash('dashboard', 'No puedes eliminar la sesion que estas usando ahora mismo.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    if (
+        (string) $usuarioObjetivo['rol'] === 'admin' &&
+        UsuarioModel::countAdmins($pdo, $deleteUserId) === 0
+    ) {
+        setFlash('dashboard', 'No puedes eliminar al ultimo administrador activo.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    UsuarioModel::deactivate($pdo, $deleteUserId);
+    setFlash('dashboard', 'Perfil eliminado correctamente.', 'success');
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
 $data = DashboardController::getData($idUsuario);
 $flash = getFlash('dashboard');
 $flashMeta = $flash['meta'] ?? [];
@@ -110,6 +215,19 @@ $companyFormData = array_merge([
     'nrc'           => '',
     'tipo_legal'    => 'natural',
 ], is_array($flashMeta['old'] ?? null) ? $flashMeta['old'] : []);
+$profileFormData = array_merge([
+    'username' => '',
+    'rol'      => 'user',
+], is_array($flashMeta['user_old'] ?? null) ? $flashMeta['user_old'] : []);
+$editProfileFormData = array_merge([
+    'id'       => 0,
+    'username' => '',
+    'rol'      => 'user',
+], is_array($flashMeta['edit_user_old'] ?? null) ? $flashMeta['edit_user_old'] : []);
+$roleLabels = [
+    'admin' => 'Administrador',
+    'user'  => 'Usuario',
+];
 $basePath = '';
 $empresaActivaNavbar = $data['empresa_activa'] ?? null;
 ?>
@@ -563,6 +681,55 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         max-width: 32rem;
       }
 
+      .profile-role-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 112px;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .profile-role-pill--admin {
+        background: rgba(13, 110, 253, 0.12);
+        color: #0d6efd;
+      }
+
+      .profile-role-pill--user {
+        background: rgba(25, 135, 84, 0.12);
+        color: #198754;
+      }
+
+      .profile-helper-card {
+        border: 1px solid rgba(124, 134, 153, 0.16);
+        border-radius: 16px;
+        background: #f8faff;
+        padding: 0.95rem 1rem;
+      }
+
+      .profile-helper-card strong {
+        display: block;
+        color: #111827;
+        font-size: 0.92rem;
+        margin-bottom: 0.2rem;
+      }
+
+      .profile-helper-card span {
+        color: #6c7383;
+        font-size: 0.84rem;
+        line-height: 1.5;
+      }
+
+      .profile-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
       @media (max-width: 991.98px) {
         .empresa-modal-layout {
           grid-template-columns: 1fr;
@@ -728,6 +895,103 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
                 </div>
               </div>
             </div>
+
+            <?php if ($esAdmin): ?>
+            <div class="row">
+              <div class="col-lg-4 grid-margin stretch-card">
+                <div class="card">
+                  <div class="card-body">
+                    <h4 class="card-title">Perfiles</h4>
+                    <p class="card-description mb-3">Agrega mas accesos y define si cada cuenta sera `user` o `admin`.</p>
+                    <div class="mb-3">
+                      <strong>Activos:</strong> <?php echo (int) ($data['usuarios_stats']['total'] ?? 0); ?><br>
+                      <strong>Admins:</strong> <?php echo (int) ($data['usuarios_stats']['admins'] ?? 0); ?><br>
+                      <strong>Users:</strong> <?php echo (int) ($data['usuarios_stats']['users'] ?? 0); ?>
+                    </div>
+                    <div class="profile-helper-card mb-3">
+                      <strong>Control por rol</strong>
+                      <span>Los perfiles admin pueden crear, editar y eliminar cuentas. El borrado se hace como desactivacion para no romper historicos.</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#perfilModal">
+                      Agregar perfil
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-lg-8 grid-margin stretch-card">
+                <div class="card">
+                  <div class="card-body">
+                    <h4 class="card-title">Usuarios registrados</h4>
+                    <p class="card-description">Vista rapida de los perfiles activos dentro del sistema.</p>
+                    <?php if (!empty($data['usuarios'])): ?>
+                    <div class="table-responsive">
+                      <table class="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Alta</th>
+                            <th>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <?php foreach ($data['usuarios'] as $usuario): ?>
+                          <?php $rolUsuario = (string) ($usuario['rol'] ?? 'user'); ?>
+                          <tr>
+                            <td>
+                              <?php echo htmlspecialchars((string) $usuario['username']); ?>
+                              <?php if ((int) $usuario['id'] === $idUsuario): ?>
+                              <span class="badge badge-light ms-2">Sesion actual</span>
+                              <?php endif; ?>
+                            </td>
+                            <td>
+                              <span class="profile-role-pill profile-role-pill--<?php echo $rolUsuario === 'admin' ? 'admin' : 'user'; ?>">
+                                <?php echo htmlspecialchars($roleLabels[$rolUsuario] ?? ucfirst($rolUsuario)); ?>
+                              </span>
+                            </td>
+                            <td>
+                              <?php
+                              $fechaAlta = !empty($usuario['created_at']) ? strtotime((string) $usuario['created_at']) : false;
+                              echo $fechaAlta ? htmlspecialchars(date('d/m/Y', $fechaAlta)) : '-';
+                              ?>
+                            </td>
+                            <td>
+                              <div class="profile-actions">
+                                <button
+                                  type="button"
+                                  class="btn btn-outline-primary btn-sm btn-edit-user"
+                                  data-user-id="<?php echo (int) $usuario['id']; ?>"
+                                  data-user-username="<?php echo htmlspecialchars((string) $usuario['username'], ENT_QUOTES); ?>"
+                                  data-user-role="<?php echo htmlspecialchars($rolUsuario, ENT_QUOTES); ?>"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  class="btn btn-outline-danger btn-sm btn-delete-user"
+                                  data-user-id="<?php echo (int) $usuario['id']; ?>"
+                                  data-user-name="<?php echo htmlspecialchars((string) $usuario['username'], ENT_QUOTES); ?>"
+                                  data-user-role="<?php echo htmlspecialchars($rolUsuario, ENT_QUOTES); ?>"
+                                  <?php echo (int) $usuario['id'] === $idUsuario ? 'disabled' : ''; ?>
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                          <?php endforeach; ?>
+                        </tbody>
+                      </table>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-muted mb-0">Todavia no hay perfiles registrados.</p>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <?php endif; ?>
           </div>
 
           <div class="modal fade empresa-modal" id="empresaModal" tabindex="-1" aria-labelledby="empresaModalLabel" aria-hidden="true">
@@ -934,6 +1198,146 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             </div>
           </div>
 
+          <?php if ($esAdmin): ?>
+          <div class="modal fade" id="perfilModal" tabindex="-1" aria-labelledby="perfilModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <div>
+                    <h5 class="modal-title" id="perfilModalLabel">Agregar perfil</h5>
+                    <p class="text-muted mb-0">Crea una nueva cuenta y asigna el rol correcto dentro del sistema.</p>
+                  </div>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <form method="POST" action="" id="perfilForm">
+                  <div class="modal-body">
+                    <input type="hidden" name="action" value="create_user">
+                    <div class="form-group mb-3">
+                      <label for="profile_username" class="form-label">Nombre de usuario</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="profile_username"
+                        name="username"
+                        autocomplete="username"
+                        value="<?php echo htmlspecialchars((string) $profileFormData['username']); ?>"
+                        required
+                      >
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="profile_role" class="form-label">Rol</label>
+                      <select class="form-select" id="profile_role" name="rol">
+                        <option value="user" <?php echo ($profileFormData['rol'] ?? 'user') === 'user' ? 'selected' : ''; ?>>Usuario</option>
+                        <option value="admin" <?php echo ($profileFormData['rol'] ?? 'user') === 'admin' ? 'selected' : ''; ?>>Administrador</option>
+                      </select>
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="profile_password" class="form-label">Clave</label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="profile_password"
+                        name="password"
+                        autocomplete="new-password"
+                        required
+                      >
+                    </div>
+                    <div class="form-group mb-0">
+                      <label for="profile_confirm_password" class="form-label">Confirmar clave</label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="profile_confirm_password"
+                        name="confirm_password"
+                        autocomplete="new-password"
+                        required
+                      >
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <span class="text-muted small">Admin puede gestionar perfiles. User entra a trabajar empresas y libros.</span>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">Crear perfil</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="editarPerfilModal" tabindex="-1" aria-labelledby="editarPerfilModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <div>
+                    <h5 class="modal-title" id="editarPerfilModalLabel">Editar perfil</h5>
+                    <p class="text-muted mb-0">Actualiza usuario, rol o clave. Si dejas la clave vacia, se conserva la actual.</p>
+                  </div>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <form method="POST" action="" id="editarPerfilForm">
+                  <div class="modal-body">
+                    <input type="hidden" name="action" value="edit_user">
+                    <input type="hidden" name="user_id" id="edit_user_id" value="<?php echo (int) $editProfileFormData['id']; ?>">
+                    <div class="form-group mb-3">
+                      <label for="edit_profile_username" class="form-label">Nombre de usuario</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="edit_profile_username"
+                        name="username"
+                        autocomplete="username"
+                        value="<?php echo htmlspecialchars((string) $editProfileFormData['username']); ?>"
+                        required
+                      >
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="edit_profile_role" class="form-label">Rol</label>
+                      <select class="form-select" id="edit_profile_role" name="rol">
+                        <option value="user" <?php echo ($editProfileFormData['rol'] ?? 'user') === 'user' ? 'selected' : ''; ?>>Usuario</option>
+                        <option value="admin" <?php echo ($editProfileFormData['rol'] ?? 'user') === 'admin' ? 'selected' : ''; ?>>Administrador</option>
+                      </select>
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="edit_profile_password" class="form-label">Nueva clave</label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="edit_profile_password"
+                        name="password"
+                        autocomplete="new-password"
+                      >
+                    </div>
+                    <div class="form-group mb-0">
+                      <label for="edit_profile_confirm_password" class="form-label">Confirmar nueva clave</label>
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="edit_profile_confirm_password"
+                        name="confirm_password"
+                        autocomplete="new-password"
+                      >
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <span class="text-muted small">No se permite quitar o eliminar al ultimo admin activo, ni borrar tu sesion actual.</span>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <form method="POST" action="" id="deleteUserForm" class="d-none">
+            <input type="hidden" name="action" value="delete_user">
+            <input type="hidden" name="user_id" id="delete_user_id" value="">
+          </form>
+          <?php endif; ?>
+
           <?php include __DIR__ . '/partials/_footer.php'; ?>
         </div>
       </div>
@@ -950,12 +1354,33 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         const empresaModal = empresaModalElement && window.bootstrap
           ? new bootstrap.Modal(empresaModalElement)
           : null;
+        const perfilModalElement = document.getElementById('perfilModal');
+        const perfilModal = perfilModalElement && window.bootstrap
+          ? new bootstrap.Modal(perfilModalElement)
+          : null;
+        const editarPerfilModalElement = document.getElementById('editarPerfilModal');
+        const editarPerfilModal = editarPerfilModalElement && window.bootstrap
+          ? new bootstrap.Modal(editarPerfilModalElement)
+          : null;
         const empresaForm = document.getElementById('empresaForm');
+        const perfilForm = document.getElementById('perfilForm');
+        const editarPerfilForm = document.getElementById('editarPerfilForm');
+        const deleteUserForm = document.getElementById('deleteUserForm');
         const nombreInput = document.getElementById('nombre');
         const inicialesInput = document.getElementById('iniciales');
         const colorInput = document.getElementById('color_emblema');
         const duiInput = document.getElementById('dui');
         const nitInput = document.getElementById('nit');
+        const profilePasswordInput = document.getElementById('profile_password');
+        const profileConfirmPasswordInput = document.getElementById('profile_confirm_password');
+        const editUserIdInput = document.getElementById('edit_user_id');
+        const editProfileUsernameInput = document.getElementById('edit_profile_username');
+        const editProfileRoleInput = document.getElementById('edit_profile_role');
+        const editProfilePasswordInput = document.getElementById('edit_profile_password');
+        const editProfileConfirmPasswordInput = document.getElementById('edit_profile_confirm_password');
+        const editUserButtons = document.querySelectorAll('.btn-edit-user');
+        const deleteUserButtons = document.querySelectorAll('.btn-delete-user');
+        const deleteUserIdInput = document.getElementById('delete_user_id');
         const previewAvatar = document.getElementById('empresaPreviewAvatar');
         const previewInitials = document.getElementById('empresaPreviewInitials');
         const previewName = document.getElementById('empresaPreviewName');
@@ -1034,11 +1459,77 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
           }
         }
 
+        function openModalFromFlashMeta(meta) {
+          if (!meta) {
+            return;
+          }
+
+          if (meta.open_edit_user_modal && editarPerfilModal) {
+            if (meta.edit_user_old) {
+              fillEditUserForm(meta.edit_user_old);
+            }
+            editarPerfilModal.show();
+            return;
+          }
+
+          if (meta.open_user_modal && perfilModal) {
+            perfilModal.show();
+            return;
+          }
+
+          if (meta.open_modal && empresaModal) {
+            empresaModal.show();
+          }
+        }
+
+        function fillEditUserForm(userData) {
+          if (!userData) {
+            return;
+          }
+
+          if (editUserIdInput) {
+            editUserIdInput.value = userData.id || '';
+          }
+
+          if (editProfileUsernameInput) {
+            editProfileUsernameInput.value = userData.username || '';
+          }
+
+          if (editProfileRoleInput) {
+            editProfileRoleInput.value = userData.rol || 'user';
+          }
+
+          if (editProfilePasswordInput) {
+            editProfilePasswordInput.value = '';
+          }
+
+          if (editProfileConfirmPasswordInput) {
+            editProfileConfirmPasswordInput.value = '';
+          }
+        }
+
+        function validatePasswordForm(passwordInput, confirmInput, allowEmpty) {
+          const passwordValue = passwordInput ? passwordInput.value : '';
+          const confirmValue = confirmInput ? confirmInput.value : '';
+
+          if (allowEmpty && passwordValue === '' && confirmValue === '') {
+            return null;
+          }
+
+          if (passwordValue.length < 6) {
+            return 'La clave debe tener al menos 6 caracteres.';
+          }
+
+          if (passwordValue !== confirmValue) {
+            return 'Las claves no coinciden.';
+          }
+
+          return null;
+        }
+
         function showFlashAlert(flashData) {
           if (!flashData || !window.Swal) {
-            if (flashData && flashData.meta && flashData.meta.open_modal && empresaModal) {
-              empresaModal.show();
-            }
+            openModalFromFlashMeta(flashData ? flashData.meta : null);
             return;
           }
 
@@ -1054,9 +1545,7 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             text: flashData.message || '',
             confirmButtonText: 'Entendido'
           }).then(function () {
-            if (flashData.meta && flashData.meta.open_modal && empresaModal) {
-              empresaModal.show();
-            }
+            openModalFromFlashMeta(flashData.meta);
           });
         }
 
@@ -1119,6 +1608,88 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             }
           });
         }
+
+        if (perfilForm) {
+          perfilForm.addEventListener('submit', function (event) {
+            const passwordError = validatePasswordForm(profilePasswordInput, profileConfirmPasswordInput, false);
+            if (passwordError) {
+              event.preventDefault();
+              Swal.fire({
+                icon: 'error',
+                text: passwordError,
+                confirmButtonText: 'Corregir'
+              });
+              profilePasswordInput.focus();
+            }
+          });
+        }
+
+        if (editarPerfilForm) {
+          editarPerfilForm.addEventListener('submit', function (event) {
+            const passwordError = validatePasswordForm(editProfilePasswordInput, editProfileConfirmPasswordInput, true);
+            if (passwordError) {
+              event.preventDefault();
+              Swal.fire({
+                icon: 'error',
+                text: passwordError,
+                confirmButtonText: 'Corregir'
+              });
+              if (editProfilePasswordInput) {
+                editProfilePasswordInput.focus();
+              }
+            }
+          });
+        }
+
+        editUserButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            fillEditUserForm({
+              id: button.dataset.userId || '',
+              username: button.dataset.userUsername || '',
+              rol: button.dataset.userRole || 'user'
+            });
+
+            if (editarPerfilModal) {
+              editarPerfilModal.show();
+            }
+          });
+        });
+
+        deleteUserButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            if (!deleteUserForm || !deleteUserIdInput) {
+              return;
+            }
+
+            const userId = button.dataset.userId || '';
+            const userName = button.dataset.userName || 'este perfil';
+
+            const submitDelete = function () {
+              deleteUserIdInput.value = userId;
+              deleteUserForm.submit();
+            };
+
+            if (!window.Swal) {
+              if (window.confirm('Se eliminara el perfil ' + userName + '.')) {
+                submitDelete();
+              }
+              return;
+            }
+
+            Swal.fire({
+              icon: 'warning',
+              title: 'Eliminar perfil',
+              text: 'Se desactivara el acceso de ' + userName + '.',
+              showCancelButton: true,
+              confirmButtonText: 'Eliminar',
+              cancelButtonText: 'Cancelar'
+            }).then(function (result) {
+              if (result.isConfirmed) {
+                submitDelete();
+              }
+            });
+          });
+        });
 
         syncPreview();
         showFlashAlert(flash);

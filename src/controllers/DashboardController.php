@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
+require_once __DIR__ . '/../models/UsuarioModel.php';
 
 class DashboardController {
 
@@ -16,6 +17,12 @@ class DashboardController {
         $libroActivoId    = getActiveLibroId();
         $empresaActiva    = null;
         $libroActivo      = null;
+        $usuarios         = [];
+        $usuariosStats    = [
+            'total'  => 0,
+            'admins' => 0,
+            'users'  => 0,
+        ];
 
         if ($empresaActivaId !== null) {
             $empresaActiva = EmpresaModel::getById($pdo, $empresaActivaId, $idUsuario);
@@ -25,6 +32,11 @@ class DashboardController {
             $libroActivo = LibroModel::getById($pdo, $libroActivoId, $idUsuario);
         }
 
+        if (isAdmin()) {
+            $usuarios = UsuarioModel::getActivos($pdo);
+            $usuariosStats = UsuarioModel::getResumen($pdo);
+        }
+
         return [
             'empresas'       => $empresas,
             'libros'         => $librosCompras,
@@ -32,6 +44,8 @@ class DashboardController {
             'cuota'          => $cuota,
             'empresa_activa' => $empresaActiva,
             'libro_activo'   => $libroActivo,
+            'usuarios'       => $usuarios,
+            'usuarios_stats' => $usuariosStats,
         ];
     }
 }

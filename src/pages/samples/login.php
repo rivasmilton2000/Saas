@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $error = htmlspecialchars($_GET['error'] ?? '');
+$flash = getFlash('login');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,6 +45,11 @@ $error = htmlspecialchars($_GET['error'] ?? '');
                 <h4>Hello! let's get started</h4>
                 <h6 class="font-weight-light">Sign in to continue.</h6>
                 <form class="pt-3" method="POST" action="">
+                  <?php if ($flash): ?>
+                  <div class="alert alert-<?php echo ($flash['type'] ?? 'info') === 'success' ? 'success' : 'info'; ?>" role="alert">
+                    <?php echo htmlspecialchars((string) ($flash['message'] ?? '')); ?>
+                  </div>
+                  <?php endif; ?>
                   <?php if ($error !== ''): ?>
                   <div class="alert alert-danger" role="alert"><?php echo $error; ?></div>
                   <?php endif; ?>

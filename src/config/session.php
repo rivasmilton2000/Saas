@@ -21,6 +21,17 @@ function requireGuest(): void {
     }
 }
 
+function isAdmin(): bool {
+    return isLoggedIn() && (($_SESSION['rol'] ?? null) === 'admin');
+}
+
+function requireAdmin(): void {
+    if (!isAdmin()) {
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+}
+
 function sessionData(): array {
     return [
         'id_usuario' => $_SESSION['id_usuario'] ?? null,

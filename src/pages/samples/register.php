@@ -1,22 +1,34 @@
+<?php
+require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../controllers/AuthController.php';
+require_once __DIR__ . '/../../models/UsuarioModel.php';
+
+requireGuest();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    AuthController::register();
+}
+
+$flash = getFlash('register');
+$allowAdminSelection = UsuarioModel::canSelectAdminOnPublicRegister($pdo);
+$old = array_merge([
+    'username' => '',
+    'rol'      => $allowAdminSelection ? 'admin' : 'user',
+], is_array($flash['meta']['old'] ?? null) ? $flash['meta']['old'] : []);
+?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
-    <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Skydash Admin</title>
-    <!-- plugins:css -->
+    <title>Registro - Saas Contabilidad</title>
     <link rel="stylesheet" href="../../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../../assets/vendors/css/vendor.bundle.base.css">
     <link rel="stylesheet" href="../../assets/vendors/font-awesome/css/font-awesome.min.css">
     <link rel="stylesheet" href="../../assets/vendors/mdi/css/materialdesignicons.min.css">
-    <!-- endinject -->
-    <!-- Plugin css for this page -->
-    <!-- End plugin css for this page -->
-    <!-- inject:css -->
     <link rel="stylesheet" href="../../assets/css/style.css">
-    <!-- endinject -->
     <link rel="shortcut icon" href="../../assets/images/favicon.png" />
   </head>
   <body>
@@ -29,59 +41,78 @@
                 <div class="brand-logo">
                   <img src="../../assets/images/logo.svg" alt="logo">
                 </div>
-                <h4>New here?</h4>
-                <h6 class="font-weight-light">Signing up is easy. It only takes a few steps</h6>
-                <form class="pt-3">
-                  <div class="form-group">
-                    <input type="text" class="form-control form-control-lg" id="exampleInputUsername1" placeholder="Username">
+                <h4>Crea tu cuenta</h4>
+                <h6 class="font-weight-light">Registra un perfil para entrar al sistema.</h6>
+                <form class="pt-3" method="POST" action="">
+                  <?php if ($flash): ?>
+                  <div class="alert alert-<?php echo ($flash['type'] ?? 'info') === 'danger' ? 'danger' : 'info'; ?>" role="alert">
+                    <?php echo htmlspecialchars((string) ($flash['message'] ?? '')); ?>
                   </div>
+                  <?php endif; ?>
                   <div class="form-group">
-                    <input type="email" class="form-control form-control-lg" id="exampleInputEmail1" placeholder="Email">
+                    <input
+                      type="text"
+                      name="username"
+                      class="form-control form-control-lg"
+                      id="registerUsername"
+                      placeholder="Nombre de usuario"
+                      autocomplete="username"
+                      value="<?php echo htmlspecialchars((string) $old['username']); ?>"
+                      required
+                    >
                   </div>
+                  <?php if ($allowAdminSelection): ?>
                   <div class="form-group">
-                    <select class="form-select form-select-lg" id="exampleFormControlSelect2">
-                      <option>Country</option>
-                      <option>United States of America</option>
-                      <option>United Kingdom</option>
-                      <option>India</option>
-                      <option>Germany</option>
-                      <option>Argentina</option>
+                    <select class="form-select form-select-lg" name="rol" id="registerRole">
+                      <option value="admin" <?php echo ($old['rol'] ?? 'user') === 'admin' ? 'selected' : ''; ?>>Administrador</option>
+                      <option value="user" <?php echo ($old['rol'] ?? 'user') === 'user' ? 'selected' : ''; ?>>Usuario</option>
                     </select>
+                    <small class="text-muted d-block mt-2">Aun no existe un administrador, asi que puedes crear el primero desde esta pantalla.</small>
+                  </div>
+                  <?php else: ?>
+                  <input type="hidden" name="rol" value="user">
+                  <div class="alert alert-light border" role="alert">
+                    El registro publico crea cuentas tipo <strong>user</strong>. Los perfiles <strong>admin</strong> se agregan desde el dashboard.
+                  </div>
+                  <?php endif; ?>
+                  <div class="form-group">
+                    <input
+                      type="password"
+                      name="password"
+                      class="form-control form-control-lg"
+                      id="registerPassword"
+                      placeholder="Clave"
+                      autocomplete="new-password"
+                      required
+                    >
                   </div>
                   <div class="form-group">
-                    <input type="password" class="form-control form-control-lg" id="exampleInputPassword1" placeholder="Password">
-                  </div>
-                  <div class="mb-4">
-                    <div class="form-check">
-                      <label class="form-check-label text-muted">
-                        <input type="checkbox" class="form-check-input"> I agree to all Terms & Conditions </label>
-                    </div>
+                    <input
+                      type="password"
+                      name="confirm_password"
+                      class="form-control form-control-lg"
+                      id="registerPasswordConfirm"
+                      placeholder="Confirmar clave"
+                      autocomplete="new-password"
+                      required
+                    >
                   </div>
                   <div class="mt-3 d-grid gap-2">
-                    <a class="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn" href="../../index.html">SIGN UP</a>
+                    <button type="submit" class="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn">CREAR CUENTA</button>
                   </div>
-                  <div class="text-center mt-4 font-weight-light"> Already have an account? <a href="login.html" class="text-primary">Login</a>
+                  <div class="text-center mt-4 font-weight-light"> Ya tienes una cuenta? <a href="login.php" class="text-primary">Inicia sesion</a>
                   </div>
                 </form>
               </div>
             </div>
           </div>
         </div>
-        <!-- content-wrapper ends -->
       </div>
-      <!-- page-body-wrapper ends -->
     </div>
-    <!-- container-scroller -->
-    <!-- plugins:js -->
     <script src="../../assets/vendors/js/vendor.bundle.base.js"></script>
-    <!-- endinject -->
-    <!-- Plugin js for this page -->
-    <!-- End plugin js for this page -->
-    <!-- inject:js -->
     <script src="../../assets/js/off-canvas.js"></script>
     <script src="../../assets/js/template.js"></script>
     <script src="../../assets/js/settings.js"></script>
     <script src="../../assets/js/todolist.js"></script>
-    <!-- endinject -->
   </body>
 </html>
