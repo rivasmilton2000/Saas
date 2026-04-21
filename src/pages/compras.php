@@ -196,16 +196,6 @@ $empresaActivaNavbar = $empresaActiva;
               </div>
             </div>
 
-            <?php if ($flash): ?>
-            <div class="row">
-              <div class="col-12">
-                <div class="alert alert-<?php echo htmlspecialchars($flash['type']); ?>" role="alert">
-                  <?php echo htmlspecialchars($flash['message']); ?>
-                </div>
-              </div>
-            </div>
-            <?php endif; ?>
-
             <?php if (empty($empresas)): ?>
             <div class="row">
               <div class="col-12">
@@ -487,5 +477,27 @@ $empresaActivaNavbar = $empresaActiva;
     <script src="../assets/js/template.js"></script>
     <script src="../assets/js/settings.js"></script>
     <script src="../assets/js/todolist.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const flash = <?php echo json_encode($flash, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        if (!flash || !window.Swal) {
+          return;
+        }
+
+        const iconMap = {
+          success: 'success',
+          danger: 'error',
+          warning: 'warning',
+          info: 'info'
+        };
+
+        Swal.fire({
+          icon: iconMap[flash.type] || 'info',
+          text: flash.message || '',
+          confirmButtonText: 'Entendido'
+        });
+      });
+    </script>
   </body>
 </html>

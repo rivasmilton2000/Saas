@@ -30,8 +30,8 @@ class EmpresaModel {
         $nombre     = trim((string) ($data['nombre'] ?? ''));
         $iniciales  = self::normalizarIniciales($nombre, $data['iniciales'] ?? '');
         $color      = trim((string) ($data['color_emblema'] ?? '#f97316'));
-        $dui        = self::nullable($data['dui'] ?? null);
-        $nit        = self::nullable($data['nit'] ?? null);
+        $dui        = self::normalizeDui($data['dui'] ?? null);
+        $nit        = self::normalizeNit($data['nit'] ?? null);
         $nrc        = self::nullable($data['nrc'] ?? null);
         $tipoLegal  = trim((string) ($data['tipo_legal'] ?? 'natural'));
 
@@ -84,14 +84,71 @@ class EmpresaModel {
     }
 
     public static function existeNit(PDO $pdo, int $idUsuario, string $nit): bool {
+        $nit = self::normalizeNit($nit);
+        if ($nit === null) {
+            return false;
+        }
+
         $stmt = $pdo->prepare(
             "SELECT id
              FROM empresas
              WHERE id_usuario = ? AND nit = ? AND estado = 1"
         );
-        $stmt->execute([$idUsuario, trim($nit)]);
+        $stmt->execute([$idUsuario, $nit]);
 
         return $stmt->fetch() !== false;
+    }
+
+    public static function normalizeDui($dui): ?string {
+        $digits = preg_replace('/\D+/', '', (string) $dui);
+        if ($digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) <= 8) {
+            return $digits;
+        }
+
+        return substr($digits, 0, 8) . '-' . substr($digits, 8, 1);
+    }
+
+    public static function isValidDui($dui): bool {
+        $normalizado = self::normalizeDui($dui);
+        if ($normalizado === null) {
+            return true;
+        }
+
+        return preg_match('/^\d{8}-\d$/', $normalizado) === 1;
+    }
+
+    public static function normalizeNit($nit): ?string {
+        $digits = preg_replace('/\D+/', '', (string) $nit);
+        if ($digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) <= 4) {
+            return $digits;
+        }
+
+        if (strlen($digits) <= 10) {
+            return substr($digits, 0, 4) . '-' . substr($digits, 4);
+        }
+
+        if (strlen($digits) <= 13) {
+            return substr($digits, 0, 4) . '-' . substr($digits, 4, 6) . '-' . substr($digits, 10);
+        }
+
+        return substr($digits, 0, 4) . '-' . substr($digits, 4, 6) . '-' . substr($digits, 10, 3) . '-' . substr($digits, 13, 1);
+    }
+
+    public static function isValidNit($nit): bool {
+        $normalizado = self::normalizeNit($nit);
+        if ($normalizado === null) {
+            return true;
+        }
+
+        return preg_match('/^\d{4}-\d{6}-\d{3}-\d$/', $normalizado) === 1;
     }
 
     public static function normalizarIniciales(string $nombre, ?string $iniciales = null): string {
@@ -114,7 +171,6 @@ class EmpresaModel {
             }
         }
 
-        
         return mb_substr($valor, 0, 4);
     }
 

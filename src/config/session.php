@@ -29,10 +29,11 @@ function sessionData(): array {
     ];
 }
 
-function setFlash(string $key, string $message, string $type = 'info'): void {
+function setFlash(string $key, string $message, string $type = 'info', array $meta = []): void {
     $_SESSION['_flash'][$key] = [
         'message' => $message,
         'type'    => $type,
+        'meta'    => $meta,
     ];
 }
 

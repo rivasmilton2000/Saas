@@ -29,8 +29,8 @@ class EmpresaController {
         $nombre     = trim((string) ($_POST['nombre'] ?? ''));
         $iniciales  = trim((string) ($_POST['iniciales'] ?? ''));
         $color      = trim((string) ($_POST['color_emblema'] ?? '#f97316'));
-        $dui        = trim((string) ($_POST['dui'] ?? ''));
-        $nit        = trim((string) ($_POST['nit'] ?? ''));
+        $dui        = EmpresaModel::normalizeDui($_POST['dui'] ?? '');
+        $nit        = EmpresaModel::normalizeNit($_POST['nit'] ?? '');
         $nrc        = trim((string) ($_POST['nrc'] ?? ''));
         $tipoLegal  = trim((string) ($_POST['tipo_legal'] ?? 'natural'));
 
@@ -43,6 +43,18 @@ class EmpresaController {
         if (!in_array($tipoLegal, ['natural', 'juridica'], true)) {
             http_response_code(422);
             echo json_encode(['success' => false, 'data' => null, 'message' => 'Tipo legal invalido.']);
+            return;
+        }
+
+        if (!EmpresaModel::isValidDui($dui)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'data' => null, 'message' => 'El DUI debe tener formato 12345678-9.']);
+            return;
+        }
+
+        if (!EmpresaModel::isValidNit($nit)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'data' => null, 'message' => 'El NIT debe tener formato 0000-000000-000-0.']);
             return;
         }
 
