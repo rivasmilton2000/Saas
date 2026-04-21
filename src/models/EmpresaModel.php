@@ -114,6 +114,7 @@ class EmpresaModel {
             }
         }
 
+        
         return mb_substr($valor, 0, 4);
     }
 
