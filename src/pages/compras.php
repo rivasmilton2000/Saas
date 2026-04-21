@@ -5,6 +5,7 @@ require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturaModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
+require_once __DIR__ . '/../services/DteDataService.php';
 require_once __DIR__ . '/../services/LibroImportService.php';
 
 requireLogin();
@@ -149,12 +150,17 @@ if ($libroActivo && (!$empresaActiva || (int) $libroActivo['id_empresa'] !== (in
     $libroActivo = null;
 }
 
-$facturas     = $libroActivo ? FacturaModel::getByLibro($pdo, (int) $libroActivo['id']) : [];
+$facturasRaw  = $libroActivo ? FacturaModel::getByLibro($pdo, (int) $libroActivo['id']) : [];
+$facturas     = DteDataService::hydrateFacturas($facturasRaw);
+$resumenLibro = DteDataService::resumenLibro($facturas);
 $cuota        = FacturasCuotaModel::ensure($pdo, $idUsuario);
 $flash        = getFlash('compras');
 $importResult = $_SESSION['_import_result'] ?? null;
 unset($_SESSION['_import_result']);
 $empresaActivaNavbar = $empresaActiva;
+$periodoLibroActivo = $libroActivo
+    ? (($meses[(int) $libroActivo['mes']] ?? (string) $libroActivo['mes']) . ' ' . $libroActivo['anio'])
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -169,6 +175,377 @@ $empresaActivaNavbar = $empresaActiva;
     <link rel="stylesheet" href="../assets/vendors/mdi/css/materialdesignicons.min.css">
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="shortcut icon" href="../assets/images/favicon.png" />
+    <style>
+      .compras-shell .card {
+        border: 1px solid rgba(75, 73, 172, 0.08);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+      }
+
+      .compras-hero {
+        overflow: hidden;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #ffffff 0%, #f4f6ff 55%, #eef2ff 100%);
+      }
+
+      .compras-hero .card-body {
+        padding: 1.5rem;
+      }
+
+      .compras-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0.75rem;
+        color: #4b49ac;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .compras-hero-title {
+        margin: 0;
+        color: #111827;
+        font-size: 2rem;
+        font-weight: 700;
+      }
+
+      .compras-hero-copy {
+        margin: 0.65rem 0 0;
+        max-width: 42rem;
+        color: #6b7280;
+        font-size: 0.96rem;
+      }
+
+      .compras-hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+        gap: 1.25rem;
+        align-items: start;
+      }
+
+      .compras-hero-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+      }
+
+      .compras-stat-card {
+        padding: 1rem 1.1rem;
+        border-radius: 18px;
+        border: 1px solid rgba(75, 73, 172, 0.1);
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .compras-stat-label {
+        display: block;
+        margin-bottom: 0.35rem;
+        color: #7c8699;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .compras-stat-value {
+        display: block;
+        color: #111827;
+        font-size: 1.4rem;
+        font-weight: 700;
+      }
+
+      .compras-stat-note {
+        display: block;
+        margin-top: 0.2rem;
+        color: #6b7280;
+        font-size: 0.84rem;
+      }
+
+      .compras-panel-title {
+        margin: 0;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+
+      .compras-panel-copy {
+        margin: 0.35rem 0 0;
+        color: #6b7280;
+        font-size: 0.9rem;
+      }
+
+      .compras-book-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 34px;
+        padding: 0 0.9rem;
+        border-radius: 999px;
+        background: rgba(75, 73, 172, 0.08);
+        color: #4b49ac;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .compras-info-list {
+        display: grid;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      .compras-info-item {
+        padding: 0.9rem 1rem;
+        border-radius: 16px;
+        background: #f8f9fd;
+        border: 1px solid #e6eaf3;
+      }
+
+      .compras-info-item strong {
+        display: block;
+        color: #111827;
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .compras-info-item span {
+        display: block;
+        margin-top: 0.2rem;
+        color: #6b7280;
+        font-size: 0.83rem;
+      }
+
+      .compras-book-list {
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .compras-book-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.95rem 1rem;
+        border-radius: 16px;
+        border: 1px solid #e6eaf3;
+        background: #f9faff;
+      }
+
+      .compras-book-item strong {
+        display: block;
+        color: #111827;
+        font-weight: 700;
+      }
+
+      .compras-book-item span {
+        display: block;
+        margin-top: 0.15rem;
+        color: #6b7280;
+        font-size: 0.83rem;
+      }
+
+      .compras-summary-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.9rem;
+        margin-top: 1.2rem;
+      }
+
+      .compras-summary-chip {
+        padding: 0.95rem 1rem;
+        border-radius: 18px;
+        border: 1px solid #e4e8f3;
+        background: #ffffff;
+      }
+
+      .compras-summary-chip b {
+        display: block;
+        color: #111827;
+        font-size: 1.15rem;
+        font-weight: 700;
+      }
+
+      .compras-summary-chip span {
+        display: block;
+        margin-bottom: 0.2rem;
+        color: #7c8699;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .compras-upload-box {
+        padding: 1rem;
+        border-radius: 18px;
+        border: 1px dashed rgba(75, 73, 172, 0.26);
+        background: linear-gradient(135deg, rgba(75, 73, 172, 0.05), rgba(75, 73, 172, 0.02));
+      }
+
+      .compras-upload-box .form-control {
+        min-height: 54px;
+      }
+
+      .compras-inline-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 0.9rem;
+      }
+
+      .compras-inline-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 0.8rem;
+        border-radius: 999px;
+        background: #f8f9fd;
+        border: 1px solid #e5e8f1;
+        color: #374151;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .compras-result-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.9rem;
+        margin-bottom: 1rem;
+      }
+
+      .compras-result-card {
+        padding: 1rem 1.05rem;
+        border-radius: 18px;
+        border: 1px solid #e5e8f1;
+        background: #fafbfe;
+      }
+
+      .compras-result-card strong {
+        display: block;
+        color: #111827;
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
+
+      .compras-result-card span {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: #7c8699;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .compras-result-list {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .compras-result-item {
+        padding: 0.85rem 1rem;
+        border-radius: 16px;
+        border: 1px solid #e6eaf3;
+        background: #ffffff;
+      }
+
+      .compras-result-item strong {
+        display: block;
+        color: #111827;
+        font-size: 0.9rem;
+      }
+
+      .compras-result-item small,
+      .compras-result-item span {
+        color: #6b7280;
+      }
+
+      .compras-table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid #e5e8f1;
+      }
+
+      .compras-table {
+        min-width: 1680px;
+        margin-bottom: 0;
+      }
+
+      .compras-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #1f2a44;
+        color: #ffffff;
+        border-bottom: 0;
+        white-space: nowrap;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .compras-table td {
+        vertical-align: top;
+        background: #ffffff;
+      }
+
+      .compras-table tbody tr:nth-child(even) td {
+        background: #fafbfe;
+      }
+
+      .compras-cell-wrap {
+        min-width: 120px;
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.4;
+      }
+
+      .compras-cell-wrap--wide {
+        min-width: 220px;
+      }
+
+      .compras-empty-state {
+        padding: 2.4rem 1.5rem;
+        text-align: center;
+      }
+
+      .compras-empty-state i {
+        display: inline-flex;
+        width: 72px;
+        height: 72px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 24px;
+        background: rgba(75, 73, 172, 0.08);
+        color: #4b49ac;
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+      }
+
+      @media (max-width: 1199.98px) {
+        .compras-hero-grid,
+        .compras-summary-strip,
+        .compras-result-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 767.98px) {
+        .compras-hero .card-body {
+          padding: 1.1rem;
+        }
+
+        .compras-hero-title {
+          font-size: 1.6rem;
+        }
+
+        .compras-hero-grid,
+        .compras-hero-stats,
+        .compras-summary-strip,
+        .compras-result-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="container-scroller">
@@ -176,19 +553,38 @@ $empresaActivaNavbar = $empresaActiva;
       <div class="container-fluid page-body-wrapper">
         <?php include __DIR__ . '/../partials/_sidebar.php'; ?>
         <div class="main-panel">
-          <div class="content-wrapper">
+          <div class="content-wrapper compras-shell">
             <div class="row mb-4">
               <div class="col-12">
-                <div class="card">
+                <div class="card compras-hero">
                   <div class="card-body">
-                    <div class="d-md-flex justify-content-between align-items-center">
+                    <div class="compras-hero-grid">
                       <div>
-                        <h3 class="card-title mb-1">Libro de Compras</h3>
-                        <p class="text-muted mb-0">Selecciona empresa, crea o abre tu periodo y procesa facturas JSON.</p>
+                        <span class="compras-kicker"><i class="mdi mdi-book-open-page-variant"></i> Libro de Compras</span>
+                        <h1 class="compras-hero-title">Procesa JSON DTE con una vista más clara y exacta</h1>
+                        <p class="compras-hero-copy">Selecciona tu empresa, abre el período de trabajo y revisa todo el detalle del libro con exportaciones más limpias y un sello de recepción completo.</p>
                       </div>
-                      <div class="text-md-right mt-3 mt-md-0">
-                        <div><strong>Cuota disponible:</strong> <?php echo (int) $cuota['disponibles']; ?> / <?php echo (int) $cuota['total']; ?></div>
-                        <div><strong>Consumidas:</strong> <?php echo (int) $cuota['consumidas']; ?> (<?php echo htmlspecialchars((string) $cuota['porcentaje']); ?>%)</div>
+                      <div class="compras-hero-stats">
+                        <div class="compras-stat-card">
+                          <span class="compras-stat-label">Cuota disponible</span>
+                          <span class="compras-stat-value"><?php echo (int) $cuota['disponibles']; ?> / <?php echo (int) $cuota['total']; ?></span>
+                          <span class="compras-stat-note">Documentos que aún puedes importar</span>
+                        </div>
+                        <div class="compras-stat-card">
+                          <span class="compras-stat-label">Facturas en libro</span>
+                          <span class="compras-stat-value"><?php echo (int) ($resumenLibro['cantidad'] ?? 0); ?></span>
+                          <span class="compras-stat-note"><?php echo $libroActivo ? 'Período abierto' : 'Abre un período para comenzar'; ?></span>
+                        </div>
+                        <div class="compras-stat-card">
+                          <span class="compras-stat-label">Empresa activa</span>
+                          <span class="compras-stat-value"><?php echo htmlspecialchars((string) ($empresaActiva['nombre'] ?? 'Sin empresa')); ?></span>
+                          <span class="compras-stat-note">Base de trabajo actual</span>
+                        </div>
+                        <div class="compras-stat-card">
+                          <span class="compras-stat-label">Período activo</span>
+                          <span class="compras-stat-value"><?php echo htmlspecialchars($periodoLibroActivo !== '' ? $periodoLibroActivo : 'Sin abrir'); ?></span>
+                          <span class="compras-stat-note">Estado actual del libro</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -200,9 +596,10 @@ $empresaActivaNavbar = $empresaActiva;
             <div class="row">
               <div class="col-12">
                 <div class="card">
-                  <div class="card-body text-center">
-                    <h4 class="card-title">No tienes empresas creadas</h4>
-                    <p class="text-muted">Crea tu primera empresa desde el dashboard para comenzar a procesar libros.</p>
+                  <div class="card-body compras-empty-state">
+                    <i class="mdi mdi-domain-off"></i>
+                    <h4 class="compras-panel-title mb-2">Aún no tienes empresas creadas</h4>
+                    <p class="text-muted mb-3">Crea tu primera empresa desde el dashboard y luego vuelve aquí para abrir tu Libro de Compras.</p>
                     <a href="../index.php" class="btn btn-primary">Ir al dashboard</a>
                   </div>
                 </div>
@@ -214,7 +611,13 @@ $empresaActivaNavbar = $empresaActiva;
               <div class="col-lg-4 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Empresa activa</h4>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                      <div>
+                        <h4 class="compras-panel-title">Empresa activa</h4>
+                        <p class="compras-panel-copy">Cambia la empresa de trabajo sin salir del módulo.</p>
+                      </div>
+                      <span class="compras-book-badge"><i class="mdi mdi-domain"></i> <?php echo count($empresas); ?> registradas</span>
+                    </div>
                     <form method="POST" action="">
                       <input type="hidden" name="action" value="select_company">
                       <div class="form-group">
@@ -227,16 +630,27 @@ $empresaActivaNavbar = $empresaActiva;
                           <?php endforeach; ?>
                         </select>
                       </div>
-                      <button type="submit" class="btn btn-outline-primary">Usar empresa</button>
-                      <a href="../index.php" class="btn btn-link">Crear otra empresa</a>
+                      <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-outline-primary">Usar empresa</button>
+                        <a href="../index.php" class="btn btn-light">Crear otra empresa</a>
+                      </div>
                     </form>
 
                     <?php if ($empresaActiva): ?>
-                    <hr>
-                    <p class="mb-1"><strong>Iniciales:</strong> <?php echo htmlspecialchars((string) ($empresaActiva['iniciales'] ?: '-')); ?></p>
-                    <p class="mb-1"><strong>NIT:</strong> <?php echo htmlspecialchars((string) ($empresaActiva['nit'] ?: '-')); ?></p>
-                    <p class="mb-1"><strong>NRC:</strong> <?php echo htmlspecialchars((string) ($empresaActiva['nrc'] ?: '-')); ?></p>
-                    <p class="mb-0"><strong>Tipo legal:</strong> <?php echo htmlspecialchars((string) $empresaActiva['tipo_legal']); ?></p>
+                    <div class="compras-info-list">
+                      <div class="compras-info-item">
+                        <strong><?php echo htmlspecialchars((string) $empresaActiva['nombre']); ?></strong>
+                        <span>Empresa seleccionada para esta sesión de trabajo.</span>
+                      </div>
+                      <div class="compras-info-item">
+                        <strong>Iniciales y tipo legal</strong>
+                        <span><?php echo htmlspecialchars((string) ($empresaActiva['iniciales'] ?: '-')); ?> · <?php echo htmlspecialchars((string) $empresaActiva['tipo_legal']); ?></span>
+                      </div>
+                      <div class="compras-info-item">
+                        <strong>Documentos fiscales</strong>
+                        <span>NIT: <?php echo htmlspecialchars((string) ($empresaActiva['nit'] ?: '-')); ?> · NRC: <?php echo htmlspecialchars((string) ($empresaActiva['nrc'] ?: '-')); ?></span>
+                      </div>
+                    </div>
                     <?php endif; ?>
                   </div>
                 </div>
@@ -245,8 +659,13 @@ $empresaActivaNavbar = $empresaActiva;
               <div class="col-lg-4 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Crear libro nuevo</h4>
-                    <p class="card-description">Si el periodo ya existe se abrira automaticamente.</p>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                      <div>
+                        <h4 class="compras-panel-title">Crear o abrir período</h4>
+                        <p class="compras-panel-copy">Si el mes ya existe, el sistema abrirá el libro guardado.</p>
+                      </div>
+                      <span class="compras-book-badge"><i class="mdi mdi-calendar-month-outline"></i> Compras</span>
+                    </div>
                     <form method="POST" action="">
                       <input type="hidden" name="action" value="create_book">
                       <div class="form-group">
@@ -267,6 +686,11 @@ $empresaActivaNavbar = $empresaActiva;
                       </div>
                       <button type="submit" class="btn btn-primary">Crear o abrir libro</button>
                     </form>
+
+                    <div class="compras-inline-badges">
+                      <span class="compras-inline-badge"><i class="mdi mdi-check-circle-outline"></i> Tipos válidos 03, 05 y 06</span>
+                      <span class="compras-inline-badge"><i class="mdi mdi-alert-circle-outline"></i> Se omiten duplicadas</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -274,30 +698,30 @@ $empresaActivaNavbar = $empresaActiva;
               <div class="col-lg-4 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Libros guardados</h4>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                      <div>
+                        <h4 class="compras-panel-title">Libros guardados</h4>
+                        <p class="compras-panel-copy">Accede rápido a períodos anteriores de la empresa activa.</p>
+                      </div>
+                      <span class="compras-book-badge"><i class="mdi mdi-book-multiple-outline"></i> <?php echo count($libros); ?> períodos</span>
+                    </div>
                     <?php if (!empty($libros)): ?>
-                    <div class="table-responsive">
-                      <table class="table table-sm">
-                        <thead>
-                          <tr>
-                            <th>Periodo</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <?php foreach ($libros as $libro): ?>
-                          <tr>
-                            <td><?php echo htmlspecialchars($meses[(int) $libro['mes']] ?? (string) $libro['mes']); ?> <?php echo htmlspecialchars((string) $libro['anio']); ?></td>
-                            <td class="text-right">
-                              <a href="?open=<?php echo (int) $libro['id']; ?>" class="btn btn-sm btn-outline-primary">Abrir</a>
-                            </td>
-                          </tr>
-                          <?php endforeach; ?>
-                        </tbody>
-                      </table>
+                    <div class="compras-book-list">
+                      <?php foreach ($libros as $libro): ?>
+                      <div class="compras-book-item">
+                        <div>
+                          <strong><?php echo htmlspecialchars($meses[(int) $libro['mes']] ?? (string) $libro['mes']); ?> <?php echo htmlspecialchars((string) $libro['anio']); ?></strong>
+                          <span><?php echo (int) $libro['id'] === (int) ($libroActivo['id'] ?? 0) ? 'Libro activo actualmente' : 'Disponible para abrir'; ?></span>
+                        </div>
+                        <a href="?open=<?php echo (int) $libro['id']; ?>" class="btn btn-sm btn-outline-primary">Abrir</a>
+                      </div>
+                      <?php endforeach; ?>
                     </div>
                     <?php else: ?>
-                    <p class="text-muted mb-0">No hay libros de compras guardados para esta empresa.</p>
+                    <div class="compras-empty-state py-4">
+                      <i class="mdi mdi-book-remove-outline"></i>
+                      <p class="text-muted mb-0">No hay libros de compras guardados para esta empresa.</p>
+                    </div>
                     <?php endif; ?>
                   </div>
                 </div>
@@ -306,34 +730,66 @@ $empresaActivaNavbar = $empresaActiva;
 
             <?php if ($libroActivo): ?>
             <div class="row">
-              <div class="col-12 grid-margin stretch-card">
+              <div class="col-xl-8 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <div class="d-md-flex justify-content-between align-items-center">
+                    <div class="d-md-flex justify-content-between align-items-start mb-3">
                       <div>
-                        <h4 class="card-title mb-1">Libro activo</h4>
-                        <p class="mb-0">
-                          <strong><?php echo htmlspecialchars((string) $libroActivo['empresa_nombre']); ?></strong>
-                          |
-                          <?php echo htmlspecialchars($meses[(int) $libroActivo['mes']] ?? (string) $libroActivo['mes']); ?>
-                          <?php echo htmlspecialchars((string) $libroActivo['anio']); ?>
-                        </p>
+                        <span class="compras-kicker mb-2"><i class="mdi mdi-folder-open-outline"></i> Libro activo</span>
+                        <h4 class="compras-panel-title"><?php echo htmlspecialchars((string) $libroActivo['empresa_nombre']); ?> · <?php echo htmlspecialchars($periodoLibroActivo); ?></h4>
+                        <p class="compras-panel-copy">Exporta tu libro, revisa totales y conserva una vista más clara de cada documento.</p>
                       </div>
-                      <div class="mt-3 mt-md-0">
-                        <a href="../api/facturas/exportar.php?id_libro=<?php echo (int) $libroActivo['id']; ?>&formato=excel" class="btn btn-outline-primary">Exportar Excel</a>
+                      <div class="d-flex flex-wrap gap-2 mt-3 mt-md-0">
+                        <a href="../api/facturas/exportar.php?id_libro=<?php echo (int) $libroActivo['id']; ?>&formato=excel" class="btn btn-outline-primary">Excel</a>
+                        <a href="../api/facturas/exportar.php?id_libro=<?php echo (int) $libroActivo['id']; ?>&formato=pdf" class="btn btn-outline-primary" target="_blank" rel="noopener">PDF</a>
                         <a href="../api/facturas/exportar.php?id_libro=<?php echo (int) $libroActivo['id']; ?>&formato=anexo_mh_a3" class="btn btn-outline-primary">Anexo MH A3</a>
                         <a href="?clear_book=1" class="btn btn-light">Cerrar libro</a>
                       </div>
                     </div>
-                    <hr>
+
+                    <div class="compras-summary-strip">
+                      <div class="compras-summary-chip">
+                        <span>Documentos</span>
+                        <b><?php echo (int) ($resumenLibro['cantidad'] ?? 0); ?></b>
+                      </div>
+                      <div class="compras-summary-chip">
+                        <span>Total compras</span>
+                        <b><?php echo DteDataService::formatDecimal($resumenLibro['total_compras'] ?? 0); ?></b>
+                      </div>
+                      <div class="compras-summary-chip">
+                        <span>Crédito fiscal</span>
+                        <b><?php echo DteDataService::formatDecimal($resumenLibro['credito_fiscal'] ?? 0); ?></b>
+                      </div>
+                      <div class="compras-summary-chip">
+                        <span>IVA retenido</span>
+                        <b><?php echo DteDataService::formatDecimal($resumenLibro['iva_retenido'] ?? 0); ?></b>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-xl-4 grid-margin stretch-card">
+                <div class="card">
+                  <div class="card-body">
+                    <h4 class="compras-panel-title">Importar archivos JSON</h4>
+                    <p class="compras-panel-copy">Sube uno o varios DTE para clasificarlos, validar duplicados y descontar solo lo realmente importado.</p>
                     <form method="POST" action="" enctype="multipart/form-data">
                       <input type="hidden" name="action" value="import_json">
-                      <div class="form-group">
-                        <label for="json_files">Importar archivos JSON</label>
-                        <input type="file" class="form-control" id="json_files" name="json_files[]" accept=".json,application/json" multiple>
+                      <div class="compras-upload-box">
+                        <div class="form-group mb-3">
+                          <label for="json_files">Seleccionar archivos</label>
+                          <input type="file" class="form-control" id="json_files" name="json_files[]" accept=".json,application/json" multiple>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Importar JSON</button>
                       </div>
-                      <button type="submit" class="btn btn-primary">Importar JSON</button>
                     </form>
+
+                    <div class="compras-inline-badges">
+                      <span class="compras-inline-badge"><i class="mdi mdi-file-document-multiple-outline"></i> Lotes múltiples</span>
+                      <span class="compras-inline-badge"><i class="mdi mdi-filter-check-outline"></i> Filtra DTE válidos</span>
+                      <span class="compras-inline-badge"><i class="mdi mdi-shield-outline"></i> Respeta cuota disponible</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -344,57 +800,74 @@ $empresaActivaNavbar = $empresaActiva;
               <div class="col-12">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Resultado de importacion</h4>
-                    <p class="mb-3">
-                      <strong>Importadas:</strong> <?php echo (int) ($importResult['importadas'] ?? 0); ?>
-                      |
-                      <strong>Duplicadas:</strong> <?php echo count($importResult['duplicadas'] ?? []); ?>
-                      |
-                      <strong>Invalidas:</strong> <?php echo count($importResult['invalidas'] ?? []); ?>
-                    </p>
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                      <div>
+                        <h4 class="compras-panel-title">Resultado de importación</h4>
+                        <p class="compras-panel-copy mb-0"><?php echo htmlspecialchars((string) ($importResult['message'] ?? 'Importación procesada.')); ?></p>
+                      </div>
+                      <span class="compras-book-badge"><i class="mdi mdi-counter"></i> Cuota restante: <?php echo (int) ($importResult['cuota_restante'] ?? $cuota['disponibles']); ?></span>
+                    </div>
+
+                    <div class="compras-result-grid">
+                      <div class="compras-result-card">
+                        <span>Importadas</span>
+                        <strong><?php echo (int) ($importResult['importadas'] ?? 0); ?></strong>
+                      </div>
+                      <div class="compras-result-card">
+                        <span>Duplicadas</span>
+                        <strong><?php echo count($importResult['duplicadas'] ?? []); ?></strong>
+                      </div>
+                      <div class="compras-result-card">
+                        <span>Inválidas</span>
+                        <strong><?php echo count($importResult['invalidas'] ?? []); ?></strong>
+                      </div>
+                    </div>
 
                     <?php if (!empty($importResult['invalidas'])): ?>
-                    <div class="mb-3">
-                      <h6>Documentos invalidos</h6>
-                      <ul class="mb-0">
+                    <div class="mb-4">
+                      <h5 class="mb-3">Documentos inválidos</h5>
+                      <div class="compras-result-list">
                         <?php foreach ($importResult['invalidas'] as $invalida): ?>
-                        <li>
-                          <?php echo htmlspecialchars((string) ($invalida['archivo'] ?? 'Documento')); ?>:
-                          <?php echo htmlspecialchars((string) ($invalida['razon'] ?? 'Documento invalido')); ?>
-                          <?php if (!empty($invalida['tipo_dte'])): ?>
-                            (<?php echo htmlspecialchars((string) $invalida['tipo_dte']); ?>)
+                        <div class="compras-result-item">
+                          <strong><?php echo htmlspecialchars((string) ($invalida['archivo'] ?? 'Documento')); ?></strong>
+                          <span><?php echo htmlspecialchars((string) ($invalida['razon'] ?? 'Documento inválido')); ?></span>
+                          <?php if (!empty($invalida['codigo_generacion']) || !empty($invalida['tipo_dte'])): ?>
+                          <small>
+                            <?php echo htmlspecialchars((string) ($invalida['codigo_generacion'] ?? '')); ?>
+                            <?php if (!empty($invalida['tipo_dte'])): ?>
+                              · <?php echo htmlspecialchars((string) $invalida['tipo_dte']); ?>
+                            <?php endif; ?>
+                          </small>
                           <?php endif; ?>
-                        </li>
+                        </div>
                         <?php endforeach; ?>
-                      </ul>
+                      </div>
                     </div>
                     <?php endif; ?>
 
                     <?php if (!empty($importResult['duplicadas'])): ?>
-                    <div class="mb-3">
-                      <h6>Duplicadas</h6>
-                      <ul class="mb-0">
+                    <div class="mb-4">
+                      <h5 class="mb-3">Duplicadas detectadas</h5>
+                      <div class="compras-result-list">
                         <?php foreach ($importResult['duplicadas'] as $duplicada): ?>
-                        <li>
-                          <?php echo htmlspecialchars((string) ($duplicada['archivo'] ?? 'Documento')); ?>:
-                          <?php echo htmlspecialchars((string) ($duplicada['codigo_generacion'] ?? '')); ?>
-                          - <?php echo htmlspecialchars((string) ($duplicada['razon'] ?? 'Duplicada')); ?>
-                        </li>
+                        <div class="compras-result-item">
+                          <strong><?php echo htmlspecialchars((string) ($duplicada['archivo'] ?? 'Documento')); ?></strong>
+                          <span><?php echo htmlspecialchars((string) ($duplicada['razon'] ?? 'Duplicada')); ?></span>
+                          <small><?php echo htmlspecialchars((string) ($duplicada['codigo_generacion'] ?? '')); ?></small>
+                        </div>
                         <?php endforeach; ?>
-                      </ul>
+                      </div>
                     </div>
                     <?php endif; ?>
 
                     <?php if (!empty($importResult['tipos_validos'])): ?>
-                    <div class="alert alert-warning mb-0">
-                      Tipos validos para Libro de Compras:
-                      <?php
-                      $tipos = [];
-                      foreach ($importResult['tipos_validos'] as $tipoValido) {
-                          $tipos[] = $tipoValido['codigo'] . ' = ' . $tipoValido['nombre'];
-                      }
-                      echo htmlspecialchars(implode(', ', $tipos));
-                      ?>
+                    <div class="compras-inline-badges">
+                      <?php foreach ($importResult['tipos_validos'] as $tipoValido): ?>
+                      <span class="compras-inline-badge">
+                        <i class="mdi mdi-check-circle-outline"></i>
+                        <?php echo htmlspecialchars((string) $tipoValido['codigo']); ?> = <?php echo htmlspecialchars((string) $tipoValido['nombre']); ?>
+                      </span>
+                      <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
                   </div>
@@ -407,12 +880,23 @@ $empresaActivaNavbar = $empresaActiva;
               <div class="col-12 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Facturas del libro</h4>
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                      <div>
+                        <h4 class="compras-panel-title">Facturas del libro</h4>
+                        <p class="compras-panel-copy mb-0">La tabla muestra el sello de recepción completo, el número de control íntegro y todos los montos clave del libro.</p>
+                      </div>
+                      <span class="compras-book-badge"><i class="mdi mdi-table-large"></i> <?php echo (int) ($resumenLibro['cantidad'] ?? 0); ?> registros</span>
+                    </div>
+
                     <?php if (empty($facturas)): ?>
-                    <p class="text-muted mb-0">Aun no hay facturas importadas en este libro.</p>
+                    <div class="compras-empty-state">
+                      <i class="mdi mdi-file-document-outline"></i>
+                      <h5 class="compras-panel-title mb-2">Aún no hay facturas en este libro</h5>
+                      <p class="text-muted mb-0">Importa archivos JSON para empezar a construir tu período de compras.</p>
+                    </div>
                     <?php else: ?>
-                    <div class="table-responsive">
-                      <table class="table table-striped">
+                    <div class="compras-table-wrap">
+                      <table class="table compras-table">
                         <thead>
                           <tr>
                             <th>No.</th>
@@ -425,35 +909,35 @@ $empresaActivaNavbar = $empresaActiva;
                             <th>Import.</th>
                             <th>Internas exentas</th>
                             <th>Import. exentas</th>
-                            <th>Credito fiscal</th>
+                            <th>Crédito fiscal</th>
                             <th>Total compras</th>
                             <th>IVA percibido 1%</th>
                             <th>IVA retenido 1%</th>
-                            <th>Codigo de generacion</th>
-                            <th>Sello de recepcion</th>
-                            <th>Numero control completo</th>
+                            <th>Código de generación</th>
+                            <th>Sello de recepción</th>
+                            <th>Número control completo</th>
                           </tr>
                         </thead>
                         <tbody>
                           <?php foreach ($facturas as $indice => $factura): ?>
                           <tr>
                             <td><?php echo $indice + 1; ?></td>
-                            <td><?php echo htmlspecialchars((string) $factura['fecha']); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['numero_control'] ?? '')); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['nrc'] ?? '')); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['nit'] ?? '')); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['nombre_proveedor'] ?? '')); ?></td>
-                            <td><?php echo number_format((float) ($factura['ventas_internas'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['ventas_importacion'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['ventas_internas_exentas'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['ventas_importacion_exentas'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['credito_fiscal'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['total_compras'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['iva_percibido'] ?? 0), 2); ?></td>
-                            <td><?php echo number_format((float) ($factura['iva_retenido'] ?? 0), 2); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['codigo_generacion'] ?? '')); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['sello_recepcion'] ?? '')); ?></td>
-                            <td><?php echo htmlspecialchars((string) ($factura['numero_control_completo'] ?? '')); ?></td>
+                            <td><?php echo htmlspecialchars((string) ($factura['fecha_display'] ?? DteDataService::formatDate($factura['fecha'] ?? ''))); ?></td>
+                            <td><div class="compras-cell-wrap"><?php echo htmlspecialchars((string) ($factura['numero_control'] ?? '')); ?></div></td>
+                            <td><div class="compras-cell-wrap"><?php echo htmlspecialchars((string) ($factura['nrc'] ?? '')); ?></div></td>
+                            <td><div class="compras-cell-wrap"><?php echo htmlspecialchars((string) ($factura['nit'] ?? '')); ?></div></td>
+                            <td><div class="compras-cell-wrap compras-cell-wrap--wide"><?php echo htmlspecialchars((string) ($factura['nombre_proveedor'] ?? '')); ?></div></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['ventas_internas'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['ventas_importacion'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['ventas_internas_exentas'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['ventas_importacion_exentas'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['credito_fiscal'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['total_compras'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['iva_percibido'] ?? 0); ?></td>
+                            <td class="text-right"><?php echo DteDataService::formatDecimal($factura['iva_retenido'] ?? 0); ?></td>
+                            <td><div class="compras-cell-wrap compras-cell-wrap--wide"><?php echo htmlspecialchars((string) ($factura['codigo_generacion'] ?? '')); ?></div></td>
+                            <td><div class="compras-cell-wrap compras-cell-wrap--wide"><?php echo htmlspecialchars((string) ($factura['sello_recepcion'] ?? '')); ?></div></td>
+                            <td><div class="compras-cell-wrap compras-cell-wrap--wide"><?php echo htmlspecialchars((string) ($factura['numero_control_completo'] ?? '')); ?></div></td>
                           </tr>
                           <?php endforeach; ?>
                         </tbody>

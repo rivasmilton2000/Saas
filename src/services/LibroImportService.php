@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturaModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
+require_once __DIR__ . '/DteDataService.php';
 require_once __DIR__ . '/ValidadorDTE.php';
 
 class LibroImportService {
@@ -196,21 +197,10 @@ class LibroImportService {
     ): array {
         $payload        = $documento['payload'] ?? [];
         $archivo        = $documento['archivo'] ?? 'Documento';
-        $identificacion = self::arrayValue($payload, 'identificacion');
-        $emisor         = self::arrayValue($payload, 'emisor');
-        $receptor       = self::arrayValue($payload, 'receptor');
-        $resumen        = self::arrayValue($payload, 'resumen');
+        $extraido       = DteDataService::extractDocumentoData($payload);
 
-        $codigoGeneracion = trim((string) (
-            $payload['codigoGeneracion']
-            ?? $identificacion['codigoGeneracion']
-            ?? ''
-        ));
-        $tipoDte = trim((string) (
-            $payload['tipoDte']
-            ?? $identificacion['tipoDte']
-            ?? ''
-        ));
+        $codigoGeneracion = trim((string) ($extraido['codigo_generacion'] ?? ''));
+        $tipoDte          = trim((string) ($extraido['tipo_dte'] ?? ''));
 
         if ($codigoGeneracion === '') {
             return [
@@ -261,30 +251,28 @@ class LibroImportService {
 
         $vistosLote[$codigoGeneracion] = true;
 
-        $proveedor = $emisor !== [] ? $emisor : $receptor;
-
         return [
             'estado' => 'importable',
             'data'   => [
                 'id_libro'                   => $idLibro,
                 'id_usuario'                 => $idUsuario,
                 'codigo_generacion'          => $codigoGeneracion,
-                'sello_recepcion'            => self::nullable($payload['selloRecepcion'] ?? $identificacion['selloRecibido'] ?? null),
-                'numero_control'             => self::nullable($payload['numeroControl'] ?? $identificacion['numeroControl'] ?? null),
+                'sello_recepcion'            => $extraido['sello_recepcion'] ?? null,
+                'numero_control'             => $extraido['numero_control'] ?? null,
                 'tipo_dte'                   => $tipoDte,
-                'fecha'                      => self::normalizarFecha($payload['fecEmi'] ?? $identificacion['fecEmi'] ?? null),
-                'nrc'                        => self::nullable($proveedor['nrc'] ?? null),
-                'nit'                        => self::nullable($proveedor['nit'] ?? null),
-                'nombre_proveedor'           => self::nullable($proveedor['nombre'] ?? null),
-                'ventas_internas'            => self::decimal($resumen['totalGravada'] ?? $resumen['subTotalVentas'] ?? 0),
-                'ventas_importacion'         => self::decimal($resumen['importacion'] ?? $resumen['totalImportaciones'] ?? 0),
-                'ventas_internas_exentas'    => self::decimal($resumen['totalExenta'] ?? 0),
-                'ventas_importacion_exentas' => self::decimal($resumen['totalNoSuj'] ?? 0),
-                'credito_fiscal'             => self::decimal($resumen['creditoFiscal'] ?? $resumen['totalIva'] ?? 0),
-                'total_compras'              => self::decimal($resumen['totalCompras'] ?? $resumen['montoTotalOperacion'] ?? $resumen['totalPagar'] ?? 0),
-                'iva_percibido'              => self::decimal($resumen['ivaPercibido1'] ?? $resumen['ivaPerci1'] ?? 0),
-                'iva_retenido'               => self::decimal($resumen['ivaRetenido1'] ?? $resumen['ivaRete1'] ?? 0),
-                'numero_control_completo'    => self::nullable($payload['numeroControl'] ?? $identificacion['numeroControl'] ?? null),
+                'fecha'                      => $extraido['fecha'] ?? date('Y-m-d'),
+                'nrc'                        => $extraido['nrc'] ?? null,
+                'nit'                        => $extraido['nit'] ?? null,
+                'nombre_proveedor'           => $extraido['nombre_proveedor'] ?? null,
+                'ventas_internas'            => $extraido['ventas_internas'] ?? 0,
+                'ventas_importacion'         => $extraido['ventas_importacion'] ?? 0,
+                'ventas_internas_exentas'    => $extraido['ventas_internas_exentas'] ?? 0,
+                'ventas_importacion_exentas' => $extraido['ventas_importacion_exentas'] ?? 0,
+                'credito_fiscal'             => $extraido['credito_fiscal'] ?? 0,
+                'total_compras'              => $extraido['total_compras'] ?? 0,
+                'iva_percibido'              => $extraido['iva_percibido'] ?? 0,
+                'iva_retenido'               => $extraido['iva_retenido'] ?? 0,
+                'numero_control_completo'    => $extraido['numero_control_completo'] ?? null,
                 'raw_json'                   => json_encode($payload, JSON_UNESCAPED_UNICODE),
             ],
         ];
@@ -301,36 +289,7 @@ class LibroImportService {
 
         return [$json];
     }
-
-    private static function arrayValue(array $payload, string $key): array {
-        $value = $payload[$key] ?? [];
-        return is_array($value) ? $value : [];
-    }
-
     private static function esLista(array $value): bool {
         return array_keys($value) === range(0, count($value) - 1);
-    }
-
-    private static function decimal($value): float {
-        return round((float) $value, 2);
-    }
-
-    private static function nullable($value): ?string {
-        $value = trim((string) $value);
-        return $value === '' ? null : $value;
-    }
-
-    private static function normalizarFecha($fecha): string {
-        $fecha = trim((string) $fecha);
-        if ($fecha === '') {
-            return date('Y-m-d');
-        }
-
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) === 1) {
-            return $fecha;
-        }
-
-        $timestamp = strtotime($fecha);
-        return $timestamp ? date('Y-m-d', $timestamp) : date('Y-m-d');
     }
 }

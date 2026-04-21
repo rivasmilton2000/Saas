@@ -2,6 +2,8 @@
 
 class FacturaModel {
 
+    private static bool $schemaChecked = false;
+
     public static function getByLibro(PDO $pdo, int $idLibro): array {
         $stmt = $pdo->prepare(
             "SELECT *
@@ -15,6 +17,8 @@ class FacturaModel {
     }
 
     public static function insertarFactura(PDO $pdo, array $data): int {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
             "INSERT INTO facturas (
                 id_libro,
@@ -81,5 +85,25 @@ class FacturaModel {
         $stmt->execute([$idLibro]);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    private static function ensureSchema(PDO $pdo): void {
+        if (self::$schemaChecked) {
+            return;
+        }
+
+        self::$schemaChecked = true;
+
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM facturas LIKE 'sello_recepcion'");
+            $columna = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+            $tipoActual = strtolower((string) ($columna['Type'] ?? ''));
+
+            if ($tipoActual !== '' && str_contains($tipoActual, 'varchar(50)')) {
+                $pdo->exec("ALTER TABLE facturas MODIFY sello_recepcion TEXT NULL");
+            }
+        } catch (Throwable $exception) {
+            // Si no se puede alterar la tabla, continuamos con el esquema actual.
+        }
     }
 }

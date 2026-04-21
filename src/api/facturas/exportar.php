@@ -57,7 +57,12 @@ if ($modo === 'json') {
 }
 
 if ($formato === 'excel') {
-    LibroExportService::descargarExcel($nombreArchivo, $facturas);
+    LibroExportService::descargarExcel($nombreArchivo, $libro, $facturas);
+    exit;
+}
+
+if ($formato === 'pdf') {
+    LibroExportService::descargarPdf($nombreArchivo, $libro, $facturas);
     exit;
 }
 

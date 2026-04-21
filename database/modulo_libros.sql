@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS facturas (
     id_libro INT NOT NULL,
     id_usuario INT NOT NULL,
     codigo_generacion VARCHAR(50) NOT NULL,
-    sello_recepcion VARCHAR(50) NULL,
+    sello_recepcion TEXT NULL,
     numero_control VARCHAR(50) NULL,
     tipo_dte VARCHAR(10) NULL,
     fecha DATE NOT NULL,
