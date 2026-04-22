@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../models/LibroModel.php';
+require_once __DIR__ . '/../../services/BitacoraService.php';
 require_once __DIR__ . '/../../services/LibroVistaService.php';
 
 header('Content-Type: application/json');
@@ -44,6 +45,28 @@ if (!$libro) {
 }
 
 $resultado = LibroVistaService::importar($pdo, $libro, $idUsuario, $documentos);
+
+if (($resultado['success'] ?? false) === true) {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($libro['tipo'] ?? 'libros'),
+        'importar_api',
+        'Importo documentos por API al libro ' . (string) ($libro['tipo'] ?? 'libros') . '.',
+        [
+            'username'     => (string) ($_SESSION['username'] ?? ''),
+            'rol'          => (string) ($_SESSION['rol'] ?? 'user'),
+            'entidad_tipo' => 'libro',
+            'entidad_id'   => (int) ($libro['id'] ?? 0),
+            'contexto'     => [
+                'empresa'    => (string) ($libro['empresa_nombre'] ?? ''),
+                'periodo'    => str_pad((string) ($libro['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libro['anio'] ?? ''),
+                'libro'      => (string) ($libro['tipo'] ?? 'Libro'),
+                'documentos' => count($documentos),
+            ],
+        ]
+    );
+}
 
 if (($resultado['success'] ?? false) === false) {
     http_response_code(422);

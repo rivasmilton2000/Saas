@@ -5,12 +5,213 @@ require_once __DIR__ . '/config/modulos.php';
 require_once __DIR__ . '/controllers/DashboardController.php';
 require_once __DIR__ . '/models/EmpresaModel.php';
 require_once __DIR__ . '/models/UsuarioModel.php';
+require_once __DIR__ . '/services/BitacoraService.php';
+require_once __DIR__ . '/services/CentroMandoService.php';
 
 requireLogin();
 
 $session = sessionData();
 $idUsuario = (int) $session['id_usuario'];
 $esAdmin = isAdmin();
+$zonaHorariaLocal = new DateTimeZone('America/El_Salvador');
+$ahoraLocal = new DateTimeImmutable('now', $zonaHorariaLocal);
+$mesActual = (int) $ahoraLocal->format('n');
+$anioActual = (int) $ahoraLocal->format('Y');
+$registrarBitacora = static function (
+    string $modulo,
+    string $accion,
+    string $descripcion,
+    array $opciones = []
+) use ($pdo, $idUsuario, $session): void {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        $modulo,
+        $accion,
+        $descripcion,
+        array_merge([
+            'username' => (string) ($session['username'] ?? ''),
+            'rol'      => (string) ($session['rol'] ?? 'user'),
+        ], $opciones)
+    );
+};
+
+if (isset($_GET['activate_company'])) {
+    $idEmpresaActiva = (int) ($_GET['activate_company'] ?? 0);
+    $redirectTo      = trim((string) ($_GET['redirect_to'] ?? 'index.php'));
+    $empresaActiva   = $idEmpresaActiva > 0 ? EmpresaModel::getById($pdo, $idEmpresaActiva, $idUsuario) : null;
+    $rutasValidas    = ['index.php'];
+
+    foreach (getLibroModules() as $modulo) {
+        $rutaModulo = trim((string) ($modulo['ruta'] ?? ''));
+        if ($rutaModulo !== '') {
+            $rutasValidas[] = $rutaModulo;
+        }
+    }
+
+    if ($empresaActiva) {
+        setActiveEmpresaId($idEmpresaActiva);
+        setActiveLibroId(null);
+        EmpresaModel::marcarUltimaUsada($pdo, $idEmpresaActiva, $idUsuario);
+        $registrarBitacora(
+            'dashboard',
+            'cambiar_empresa_activa',
+            'Cambio la empresa activa a ' . (string) ($empresaActiva['nombre'] ?? 'Empresa') . '.',
+            [
+                'entidad_tipo' => 'empresa',
+                'entidad_id'   => (int) ($empresaActiva['id'] ?? 0),
+                'contexto'     => [
+                    'empresa' => (string) ($empresaActiva['nombre'] ?? 'Empresa'),
+                ],
+            ]
+        );
+    } else {
+        setFlash('dashboard', 'No se encontro la empresa que intentas abrir.', 'danger');
+        $redirectTo = 'index.php';
+    }
+
+    if (!in_array($redirectTo, $rutasValidas, true)) {
+        $redirectTo = 'index.php';
+    }
+
+    header('Location: /Saas/src/' . ltrim($redirectTo, '/'));
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hide_command_center_welcome') {
+    CentroMandoService::hideWelcome($pdo, $idUsuario);
+    $registrarBitacora('dashboard', 'ocultar_bienvenida', 'Oculto la bienvenida del centro de mando.');
+    setFlash('dashboard', 'La bienvenida inicial ya no se mostrara de nuevo.', 'success');
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_command_center_config') {
+    $idEmpresa = (int) ($_POST['empresa_id'] ?? 0);
+    $empresa   = $idEmpresa > 0 ? EmpresaModel::getById($pdo, $idEmpresa, $idUsuario) : null;
+
+    if (!$empresa) {
+        setFlash('dashboard', 'La empresa seleccionada no existe o no te pertenece.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $resultado = CentroMandoService::saveConfig($pdo, $idEmpresa, $idUsuario, $_POST['items'] ?? []);
+    if (!($resultado['success'] ?? false)) {
+        setFlash('dashboard', (string) ($resultado['message'] ?? 'No se pudo guardar el checklist.'), 'danger', [
+            'open_command_config' => [
+                'company_id'     => $idEmpresa,
+                'company_name'   => (string) ($empresa['nombre'] ?? 'Empresa'),
+                'selected_keys'  => $resultado['data']['selected_keys'] ?? CentroMandoService::getDefaultSelectedKeys(),
+            ],
+        ]);
+    } else {
+        EmpresaModel::marcarUltimaUsada($pdo, $idEmpresa, $idUsuario);
+        $registrarBitacora(
+            'dashboard',
+            'guardar_checklist',
+            'Guardo el checklist mensual de ' . (string) ($empresa['nombre'] ?? 'Empresa') . '.',
+            [
+                'entidad_tipo' => 'empresa',
+                'entidad_id'   => (int) ($empresa['id'] ?? 0),
+                'contexto'     => [
+                    'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                    'detalle' => count($resultado['data']['selected_keys'] ?? []) . ' controles seleccionados',
+                ],
+            ]
+        );
+        setFlash('dashboard', (string) ($resultado['message'] ?? 'Checklist guardado.'), 'success');
+    }
+
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_command_center_item') {
+    $idEmpresa   = (int) ($_POST['empresa_id'] ?? 0);
+    $itemKey     = trim((string) ($_POST['item_key'] ?? ''));
+    $completado  = (int) ($_POST['completed'] ?? 0) === 1;
+    $empresa     = $idEmpresa > 0 ? EmpresaModel::getById($pdo, $idEmpresa, $idUsuario) : null;
+
+    if (!$empresa) {
+        setFlash('dashboard', 'No puedes actualizar una empresa que no te pertenece.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $resultado = CentroMandoService::toggleManualItem(
+        $pdo,
+        $idEmpresa,
+        $idUsuario,
+        $itemKey,
+        $completado,
+        $mesActual,
+        $anioActual
+    );
+
+    if (($resultado['success'] ?? false) === true) {
+        $registrarBitacora(
+            'dashboard',
+            'actualizar_control',
+            'Marco un control del centro de mando para ' . (string) ($empresa['nombre'] ?? 'Empresa') . '.',
+            [
+                'entidad_tipo' => 'empresa',
+                'entidad_id'   => (int) ($empresa['id'] ?? 0),
+                'contexto'     => [
+                    'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                    'periodo' => str_pad((string) $mesActual, 2, '0', STR_PAD_LEFT) . '/' . $anioActual,
+                    'detalle' => $itemKey . ': ' . ($completado ? 'completado' : 'pendiente'),
+                ],
+            ]
+        );
+    }
+
+    setFlash(
+        'dashboard',
+        (string) ($resultado['message'] ?? 'Control actualizado.'),
+        ($resultado['success'] ?? false) ? 'success' : 'danger'
+    );
+    header('Location: /Saas/src/index.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_command_center_note') {
+    $idEmpresa = (int) ($_POST['empresa_id'] ?? 0);
+    $empresa   = $idEmpresa > 0 ? EmpresaModel::getById($pdo, $idEmpresa, $idUsuario) : null;
+
+    if (!$empresa) {
+        setFlash('dashboard', 'No puedes guardar notas para una empresa que no te pertenece.', 'danger');
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+
+    $resultado = CentroMandoService::saveNote(
+        $pdo,
+        $idEmpresa,
+        $idUsuario,
+        (string) ($_POST['nota_mensual'] ?? ''),
+        $mesActual,
+        $anioActual
+    );
+
+    $registrarBitacora(
+        'dashboard',
+        'guardar_nota_mensual',
+        'Actualizo la nota mensual de ' . (string) ($empresa['nombre'] ?? 'Empresa') . '.',
+        [
+            'entidad_tipo' => 'empresa',
+            'entidad_id'   => (int) ($empresa['id'] ?? 0),
+            'contexto'     => [
+                'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                'periodo' => str_pad((string) $mesActual, 2, '0', STR_PAD_LEFT) . '/' . $anioActual,
+            ],
+        ]
+    );
+
+    setFlash('dashboard', (string) ($resultado['message'] ?? 'Nota guardada.'), 'success');
+    header('Location: /Saas/src/index.php');
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_company') {
     $nombre       = trim((string) ($_POST['nombre'] ?? ''));
@@ -96,6 +297,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     ]);
 
     setActiveEmpresaId($idEmpresa);
+    $registrarBitacora(
+        'dashboard',
+        'crear_empresa',
+        'Creo la empresa ' . $nombre . '.',
+        [
+            'entidad_tipo' => 'empresa',
+            'entidad_id'   => $idEmpresa,
+            'contexto'     => [
+                'empresa' => $nombre,
+            ],
+        ]
+    );
     setFlash('dashboard', 'Empresa creada correctamente. Ya puedes trabajar tus libros.', 'success');
     header('Location: /Saas/src/index.php');
     exit;
@@ -119,7 +332,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         exit;
     }
 
-    UsuarioModel::create($pdo, $validation['data']);
+    $idNuevoUsuario = UsuarioModel::create($pdo, $validation['data']);
+    $registrarBitacora(
+        'usuarios',
+        'crear_usuario',
+        'Creo el perfil ' . (string) ($validation['data']['username'] ?? 'usuario') . '.',
+        [
+            'entidad_tipo' => 'usuario',
+            'entidad_id'   => $idNuevoUsuario,
+            'contexto'     => [
+                'usuario_objetivo' => (string) ($validation['data']['username'] ?? 'usuario'),
+            ],
+        ]
+    );
     setFlash('dashboard', 'Perfil creado correctamente.', 'success');
     header('Location: /Saas/src/index.php');
     exit;
@@ -151,6 +376,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
     }
 
     UsuarioModel::update($pdo, $editUserId, $validation['data']);
+    $registrarBitacora(
+        'usuarios',
+        'editar_usuario',
+        'Actualizo el perfil ' . (string) ($validation['data']['username'] ?? 'usuario') . '.',
+        [
+            'entidad_tipo' => 'usuario',
+            'entidad_id'   => $editUserId,
+            'contexto'     => [
+                'usuario_objetivo' => (string) ($validation['data']['username'] ?? 'usuario'),
+            ],
+        ]
+    );
 
     if ($editUserId === $idUsuario) {
         $_SESSION['username'] = $validation['data']['username'];
@@ -199,6 +436,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     }
 
     UsuarioModel::deactivate($pdo, $deleteUserId);
+    $registrarBitacora(
+        'usuarios',
+        'desactivar_usuario',
+        'Desactivo el perfil ' . (string) ($usuarioObjetivo['username'] ?? 'usuario') . '.',
+        [
+            'entidad_tipo' => 'usuario',
+            'entidad_id'   => $deleteUserId,
+            'contexto'     => [
+                'usuario_objetivo' => (string) ($usuarioObjetivo['username'] ?? 'usuario'),
+            ],
+        ]
+    );
     setFlash('dashboard', 'Perfil eliminado correctamente.', 'success');
     header('Location: /Saas/src/index.php');
     exit;
@@ -209,6 +458,7 @@ $modulosLibros = array_filter(
     getLibroModules(),
     static fn(array $modulo): bool => ($modulo['visible_dashboard'] ?? false) === true
 );
+$centroMando = is_array($data['centro_mando'] ?? null) ? $data['centro_mando'] : [];
 $flash = getFlash('dashboard');
 $flashMeta = $flash['meta'] ?? [];
 $companyFormData = array_merge([
@@ -235,6 +485,13 @@ $roleLabels = [
 ];
 $basePath = '';
 $empresaActivaNavbar = $data['empresa_activa'] ?? null;
+$horaActual = (int) $ahoraLocal->format('G');
+$saludoTitulo = $horaActual < 12
+    ? 'Buenos días'
+    : ($horaActual < 19 ? 'Buenas tardes' : 'Buenas noches');
+$saludoPersona = !empty($data['empresa_activa']['nombre'])
+    ? (string) $data['empresa_activa']['nombre']
+    : (string) ($session['username'] ?? 'equipo');
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -686,6 +943,365 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         max-width: 32rem;
       }
 
+      .command-hero-card {
+        border: 0;
+        border-radius: 28px;
+        background:
+          radial-gradient(circle at top right, rgba(79, 70, 229, 0.08), transparent 30%),
+          linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+        box-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
+      }
+
+      .command-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.42rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(75, 73, 172, 0.1);
+        color: #4b49ac;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .command-hero-title {
+        margin: 1rem 0 0.8rem;
+        color: #0f172a;
+        font-size: clamp(2rem, 4vw, 3.15rem);
+        font-weight: 800;
+        line-height: 1.05;
+      }
+
+      .command-hero-text {
+        max-width: 42rem;
+        margin: 0;
+        color: #5b6474;
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+
+      .command-metrics-grid {
+        width: min(100%, 540px);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .command-metric-card {
+        padding: 1rem 1.05rem;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(8px);
+      }
+
+      .command-metric-label {
+        display: block;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .command-metric-value {
+        display: block;
+        margin-top: 0.55rem;
+        color: #0f172a;
+        font-size: 1.25rem;
+        font-weight: 800;
+      }
+
+      .command-metric-note {
+        display: block;
+        margin-top: 0.45rem;
+        color: #64748b;
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+
+      .command-progress {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(226, 232, 240, 0.9);
+      }
+
+      .command-empty-state {
+        padding: 3rem 1.5rem;
+        border: 1px dashed rgba(148, 163, 184, 0.5);
+        border-radius: 24px;
+        text-align: center;
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 1) 100%);
+      }
+
+      .command-empty-icon {
+        width: 70px;
+        height: 70px;
+        margin: 0 auto 1rem;
+        border-radius: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(75, 73, 172, 0.1);
+        color: #4b49ac;
+        font-size: 2rem;
+      }
+
+      .command-company-card {
+        padding: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 24px;
+        background: #ffffff;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.05);
+      }
+
+      .command-company-card + .command-company-card {
+        margin-top: 1rem;
+      }
+
+      .command-company-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .command-company-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.1rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      }
+
+      .command-mini-progress {
+        width: 180px;
+      }
+
+      .command-mini-progress .progress {
+        height: 8px;
+        border-radius: 999px;
+        background: #e2e8f0;
+      }
+
+      .command-group-block + .command-group-block {
+        margin-top: 1rem;
+      }
+
+      .command-group-head {
+        margin-bottom: 0.55rem;
+      }
+
+      .command-group-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .command-group-title small {
+        color: #94a3b8;
+        font-size: 0.82em;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .command-chip-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .command-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.68rem 0.95rem;
+        border: 1px solid rgba(191, 219, 254, 0.9);
+        border-radius: 999px;
+        background: rgba(239, 246, 255, 0.9);
+        color: #2563eb;
+        font-size: 0.92rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+
+      .command-chip:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+        text-decoration: none;
+      }
+
+      .command-chip.is-done {
+        border-color: rgba(52, 211, 153, 0.7);
+        background: rgba(236, 253, 245, 0.96);
+        color: #059669;
+      }
+
+      .command-chip.is-done:hover {
+        box-shadow: 0 10px 24px rgba(5, 150, 105, 0.12);
+        color: #047857;
+      }
+
+      button.command-chip {
+        cursor: pointer;
+      }
+
+      .command-company-note {
+        margin-top: 1rem;
+        padding: 0.95rem 1rem;
+        border-radius: 18px;
+        background: #f8fafc;
+        color: #475569;
+        line-height: 1.65;
+      }
+
+      .command-modal {
+        border: 1px solid rgba(75, 73, 172, 0.12);
+        border-radius: 24px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+      }
+
+      .command-modal .modal-header,
+      .command-modal .modal-footer {
+        border-color: rgba(148, 163, 184, 0.14);
+        padding: 1.15rem 1.35rem;
+      }
+
+      .command-modal .modal-body {
+        padding: 1.35rem;
+        max-height: calc(100vh - 260px);
+        overflow-y: auto;
+      }
+
+      .command-modal .modal-title {
+        color: #0f172a;
+        font-size: 1.35rem;
+        font-weight: 800;
+      }
+
+      .command-welcome-list {
+        display: grid;
+        gap: 0.9rem;
+      }
+
+      .command-welcome-item {
+        display: flex;
+        gap: 0.9rem;
+        align-items: flex-start;
+        padding: 1rem;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: #f8fafc;
+      }
+
+      .command-welcome-item i {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(75, 73, 172, 0.1);
+        color: #4b49ac;
+        font-size: 1.3rem;
+        flex: 0 0 auto;
+      }
+
+      .command-welcome-item strong {
+        display: block;
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 800;
+      }
+
+      .command-welcome-item span {
+        display: block;
+        margin-top: 0.2rem;
+        color: #64748b;
+        line-height: 1.55;
+      }
+
+      .command-config-section + .command-config-section {
+        margin-top: 1.2rem;
+      }
+
+      .command-config-head {
+        margin-bottom: 0.8rem;
+      }
+
+      .command-config-head span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #334155;
+        font-size: 0.86rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .command-choice-card {
+        position: relative;
+        display: block;
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .command-config-checkbox {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .command-choice-body {
+        display: block;
+        height: 100%;
+        min-height: 122px;
+        padding: 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        background: #ffffff;
+        transition: all 0.18s ease;
+      }
+
+      .command-choice-title {
+        display: block;
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 800;
+      }
+
+      .command-choice-copy {
+        display: block;
+        margin-top: 0.35rem;
+        color: #64748b;
+        line-height: 1.55;
+      }
+
+      .command-config-checkbox:checked + .command-choice-body {
+        border-color: rgba(75, 73, 172, 0.35);
+        background: rgba(238, 242, 255, 0.86);
+        box-shadow: 0 12px 28px rgba(75, 73, 172, 0.12);
+      }
+
       .profile-role-pill {
         display: inline-flex;
         align-items: center;
@@ -736,6 +1352,15 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
       }
 
       @media (max-width: 991.98px) {
+        .command-metrics-grid {
+          width: 100%;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .command-company-head {
+          flex-direction: column;
+        }
+
         .empresa-modal-layout {
           grid-template-columns: 1fr;
         }
@@ -747,6 +1372,23 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
       }
 
       @media (max-width: 767.98px) {
+        .command-hero-card .card-body,
+        .command-company-card,
+        .command-modal .modal-body,
+        .command-modal .modal-header,
+        .command-modal .modal-footer {
+          padding-left: 1rem;
+          padding-right: 1rem;
+        }
+
+        .command-metrics-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .command-mini-progress {
+          width: 100%;
+        }
+
         .empresa-modal .modal-dialog {
           margin: 0.75rem;
         }
@@ -786,6 +1428,11 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         .empresa-modal .modal-footer .btn {
           flex: 1 1 auto;
         }
+
+        .command-modal .modal-footer .btn,
+        .command-hero-copy .btn {
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -796,6 +1443,8 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         <?php include __DIR__ . '/partials/_sidebar.php'; ?>
         <div class="main-panel">
           <div class="content-wrapper">
+            <?php include __DIR__ . '/partials/_command_center_dashboard.php'; ?>
+            <?php if (false): ?>
             <div class="row mb-4">
               <div class="col-12">
                 <div class="card">
@@ -932,6 +1581,7 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
                 </div>
               </div>
             </div>
+            <?php endif; ?>
 
             <?php if ($esAdmin): ?>
             <div class="row">
@@ -1030,6 +1680,8 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             </div>
             <?php endif; ?>
           </div>
+
+          <?php include __DIR__ . '/partials/_command_center_modals.php'; ?>
 
           <div class="modal fade empresa-modal" id="empresaModal" tabindex="-1" aria-labelledby="empresaModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered empresa-modal-dialog">
@@ -1391,6 +2043,18 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         const empresaModal = empresaModalElement && window.bootstrap
           ? new bootstrap.Modal(empresaModalElement)
           : null;
+        const commandWelcomeModalElement = document.getElementById('commandWelcomeModal');
+        const commandWelcomeModal = commandWelcomeModalElement && window.bootstrap
+          ? new bootstrap.Modal(commandWelcomeModalElement)
+          : null;
+        const commandConfigModalElement = document.getElementById('commandConfigModal');
+        const commandConfigModal = commandConfigModalElement && window.bootstrap
+          ? new bootstrap.Modal(commandConfigModalElement)
+          : null;
+        const commandNoteModalElement = document.getElementById('commandNoteModal');
+        const commandNoteModal = commandNoteModalElement && window.bootstrap
+          ? new bootstrap.Modal(commandNoteModalElement)
+          : null;
         const perfilModalElement = document.getElementById('perfilModal');
         const perfilModal = perfilModalElement && window.bootstrap
           ? new bootstrap.Modal(perfilModalElement)
@@ -1400,6 +2064,14 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
           ? new bootstrap.Modal(editarPerfilModalElement)
           : null;
         const empresaForm = document.getElementById('empresaForm');
+        const commandConfigForm = document.getElementById('commandConfigForm');
+        const commandConfigEmpresaId = document.getElementById('command_config_empresa_id');
+        const commandConfigEmpresaNombre = document.getElementById('command_config_empresa_nombre');
+        const commandConfigCheckboxes = document.querySelectorAll('.command-config-checkbox');
+        const commandNoteForm = document.getElementById('commandNoteForm');
+        const commandNoteEmpresaId = document.getElementById('command_note_empresa_id');
+        const commandNoteEmpresaNombre = document.getElementById('command_note_empresa_nombre');
+        const commandNoteText = document.getElementById('command_note_text');
         const perfilForm = document.getElementById('perfilForm');
         const editarPerfilForm = document.getElementById('editarPerfilForm');
         const deleteUserForm = document.getElementById('deleteUserForm');
@@ -1417,6 +2089,9 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         const editProfileConfirmPasswordInput = document.getElementById('edit_profile_confirm_password');
         const editUserButtons = document.querySelectorAll('.btn-edit-user');
         const deleteUserButtons = document.querySelectorAll('.btn-delete-user');
+        const commandConfigButtons = document.querySelectorAll('.btn-command-config, .btn-command-open-config');
+        const commandNoteButtons = document.querySelectorAll('.btn-command-note');
+        const commandStartButton = document.querySelector('.btn-command-start');
         const deleteUserIdInput = document.getElementById('delete_user_id');
         const previewAvatar = document.getElementById('empresaPreviewAvatar');
         const previewInitials = document.getElementById('empresaPreviewInitials');
@@ -1425,6 +2100,97 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
         const previewColorHex = document.getElementById('empresaPreviewColorHex');
         const colorFieldHex = document.getElementById('empresaColorFieldHex');
         const flash = <?php echo json_encode($flash, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        const shouldShowWelcome = <?php echo !empty($centroMando['bienvenida']['mostrar']) ? 'true' : 'false'; ?>;
+
+        function parseSelectedKeys(value) {
+          if (Array.isArray(value)) {
+            return value;
+          }
+
+          if (typeof value !== 'string' || value.trim() === '') {
+            return [];
+          }
+
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (error) {
+            return [];
+          }
+        }
+
+        function openCommandConfig(options) {
+          if (!commandConfigModal || !commandConfigEmpresaId || !commandConfigEmpresaNombre) {
+            return false;
+          }
+
+          const companyId = Number(options && options.companyId ? options.companyId : 0);
+          if (!companyId) {
+            return false;
+          }
+
+          const selectedKeys = parseSelectedKeys(options && options.selectedKeys ? options.selectedKeys : []);
+
+          commandConfigEmpresaId.value = String(companyId);
+          commandConfigEmpresaNombre.textContent = options && options.companyName ? options.companyName : 'Empresa';
+
+          commandConfigCheckboxes.forEach(function (checkbox) {
+            checkbox.checked = selectedKeys.includes(checkbox.value);
+          });
+
+          commandConfigModal.show();
+          return true;
+        }
+
+        function openCommandNote(options) {
+          if (!commandNoteModal || !commandNoteEmpresaId || !commandNoteEmpresaNombre || !commandNoteText) {
+            return false;
+          }
+
+          const companyId = Number(options && options.companyId ? options.companyId : 0);
+          if (!companyId) {
+            return false;
+          }
+
+          commandNoteEmpresaId.value = String(companyId);
+          commandNoteEmpresaNombre.textContent = options && options.companyName ? options.companyName : 'Empresa';
+          commandNoteText.value = options && typeof options.note === 'string' ? options.note : '';
+          commandNoteModal.show();
+          return true;
+        }
+
+        function openFirstCommandConfig() {
+          const primaryConfigButton = document.querySelector('.btn-command-open-config[data-company-id]');
+          if (primaryConfigButton && Number(primaryConfigButton.dataset.companyId || 0) > 0) {
+            return openCommandConfig({
+              companyId: primaryConfigButton.dataset.companyId,
+              companyName: primaryConfigButton.dataset.companyName,
+              selectedKeys: primaryConfigButton.dataset.selectedKeys
+            });
+          }
+
+          const secondaryConfigButton = document.querySelector('.btn-command-config[data-company-id]');
+          if (secondaryConfigButton && Number(secondaryConfigButton.dataset.companyId || 0) > 0) {
+            return openCommandConfig({
+              companyId: secondaryConfigButton.dataset.companyId,
+              companyName: secondaryConfigButton.dataset.companyName,
+              selectedKeys: secondaryConfigButton.dataset.selectedKeys
+            });
+          }
+
+          if (empresaModal) {
+            empresaModal.show();
+            return true;
+          }
+
+          return false;
+        }
+
+        function maybeShowWelcome() {
+          if (shouldShowWelcome && commandWelcomeModal) {
+            commandWelcomeModal.show();
+          }
+        }
 
         function formatDui(value) {
           const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
@@ -1498,7 +2264,7 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
 
         function openModalFromFlashMeta(meta) {
           if (!meta) {
-            return;
+            return false;
           }
 
           if (meta.open_edit_user_modal && editarPerfilModal) {
@@ -1506,17 +2272,28 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
               fillEditUserForm(meta.edit_user_old);
             }
             editarPerfilModal.show();
-            return;
+            return true;
           }
 
           if (meta.open_user_modal && perfilModal) {
             perfilModal.show();
-            return;
+            return true;
+          }
+
+          if (meta.open_command_config) {
+            return openCommandConfig({
+              companyId: meta.open_command_config.company_id,
+              companyName: meta.open_command_config.company_name,
+              selectedKeys: meta.open_command_config.selected_keys
+            });
           }
 
           if (meta.open_modal && empresaModal) {
             empresaModal.show();
+            return true;
           }
+
+          return false;
         }
 
         function fillEditUserForm(userData) {
@@ -1566,7 +2343,10 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
 
         function showFlashAlert(flashData) {
           if (!flashData || !window.Swal) {
-            openModalFromFlashMeta(flashData ? flashData.meta : null);
+            const handled = openModalFromFlashMeta(flashData ? flashData.meta : null);
+            if (!handled) {
+              maybeShowWelcome();
+            }
             return;
           }
 
@@ -1582,7 +2362,10 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             text: flashData.message || '',
             confirmButtonText: 'Entendido'
           }).then(function () {
-            openModalFromFlashMeta(flashData.meta);
+            const handled = openModalFromFlashMeta(flashData.meta);
+            if (!handled) {
+              maybeShowWelcome();
+            }
           });
         }
 
@@ -1727,6 +2510,53 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
             });
           });
         });
+
+        commandConfigButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            openCommandConfig({
+              companyId: button.dataset.companyId,
+              companyName: button.dataset.companyName,
+              selectedKeys: button.dataset.selectedKeys
+            });
+          });
+        });
+
+        commandNoteButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            openCommandNote({
+              companyId: button.dataset.companyId,
+              companyName: button.dataset.companyName,
+              note: button.dataset.companyNote || ''
+            });
+          });
+        });
+
+        if (commandStartButton) {
+          commandStartButton.addEventListener('click', function () {
+            if (commandWelcomeModal) {
+              commandWelcomeModal.hide();
+            }
+
+            openFirstCommandConfig();
+          });
+        }
+
+        if (commandConfigForm) {
+          commandConfigForm.addEventListener('submit', function (event) {
+            const selected = Array.from(commandConfigCheckboxes).filter(function (checkbox) {
+              return checkbox.checked;
+            });
+
+            if (selected.length === 0) {
+              event.preventDefault();
+              Swal.fire({
+                icon: 'warning',
+                text: 'Selecciona al menos un control para guardar el checklist.',
+                confirmButtonText: 'Entendido'
+              });
+            }
+          });
+        }
 
         syncPreview();
         showFlashAlert(flash);

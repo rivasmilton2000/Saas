@@ -8,6 +8,7 @@ $modulos  = array_filter(
 );
 $currentPath = str_replace('\\', '/', (string) ($_SERVER['PHP_SELF'] ?? ''));
 $isDashboard = substr($currentPath, -10) === '/index.php';
+$isBitacora  = substr($currentPath, -13) === '/bitacora.php';
 ?>
 <nav class="sidebar sidebar-offcanvas" id="sidebar">
   <ul class="nav">
@@ -29,6 +30,12 @@ $isDashboard = substr($currentPath, -10) === '/index.php';
       </a>
     </li>
     <?php endforeach; ?>
+    <li class="nav-item">
+      <a class="nav-link <?php echo $isBitacora ? 'active' : ''; ?>" href="<?php echo $basePath; ?>pages/bitacora.php">
+        <i class="mdi mdi-history menu-icon"></i>
+        <span class="menu-title">Bitacora</span>
+      </a>
+    </li>
     <li class="nav-item">
       <a class="nav-link" href="<?php echo $basePath; ?>pages/samples/logout.php">
         <i class="icon-power menu-icon"></i>

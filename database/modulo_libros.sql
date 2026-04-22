@@ -95,3 +95,72 @@ CREATE TABLE IF NOT EXISTS facturas_disponibles (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_facturas_disponibles_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id)
 );
+
+CREATE TABLE IF NOT EXISTS centro_mando_config (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_empresa INT NOT NULL,
+    id_usuario INT NOT NULL,
+    item_key VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_empresa_item (id_empresa, item_key),
+    KEY idx_centro_mando_config_usuario (id_usuario),
+    CONSTRAINT fk_centro_mando_config_empresa FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
+    CONSTRAINT fk_centro_mando_config_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS centro_mando_avance (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_empresa INT NOT NULL,
+    id_usuario INT NOT NULL,
+    mes TINYINT NOT NULL,
+    anio YEAR NOT NULL,
+    item_key VARCHAR(80) NOT NULL,
+    completado TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at DATETIME NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_empresa_periodo_item (id_empresa, mes, anio, item_key),
+    KEY idx_centro_mando_avance_usuario (id_usuario),
+    CONSTRAINT fk_centro_mando_avance_empresa FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
+    CONSTRAINT fk_centro_mando_avance_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS centro_mando_notas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_empresa INT NOT NULL,
+    id_usuario INT NOT NULL,
+    mes TINYINT NOT NULL,
+    anio YEAR NOT NULL,
+    nota TEXT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_empresa_periodo_nota (id_empresa, mes, anio),
+    KEY idx_centro_mando_notas_usuario (id_usuario),
+    CONSTRAINT fk_centro_mando_notas_empresa FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
+    CONSTRAINT fk_centro_mando_notas_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS centro_mando_preferencias (
+    id_usuario INT PRIMARY KEY,
+    ocultar_bienvenida TINYINT(1) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_centro_mando_preferencias_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bitacora_movimientos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_usuario INT NOT NULL,
+    username_snapshot VARCHAR(100) NOT NULL,
+    rol_snapshot VARCHAR(20) DEFAULT NULL,
+    modulo VARCHAR(80) NOT NULL,
+    accion VARCHAR(120) NOT NULL,
+    descripcion VARCHAR(255) NOT NULL,
+    entidad_tipo VARCHAR(80) DEFAULT NULL,
+    entidad_id INT DEFAULT NULL,
+    contexto_json LONGTEXT DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    user_agent VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_bitacora_usuario (id_usuario),
+    KEY idx_bitacora_fecha (created_at),
+    KEY idx_bitacora_modulo (modulo),
+    CONSTRAINT fk_bitacora_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
+);

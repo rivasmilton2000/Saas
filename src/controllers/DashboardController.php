@@ -5,6 +5,7 @@ require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
 require_once __DIR__ . '/../models/UsuarioModel.php';
+require_once __DIR__ . '/../services/CentroMandoService.php';
 
 class DashboardController {
 
@@ -52,6 +53,8 @@ class DashboardController {
             $usuariosStats = UsuarioModel::getResumen($pdo);
         }
 
+        $centroMando = CentroMandoService::build($empresas, $libros, $cuota, $pdo, $idUsuario);
+
         return [
             'empresas'       => $empresas,
             'libros'         => $libros,
@@ -62,6 +65,7 @@ class DashboardController {
             'libro_activo'   => $libroActivo,
             'usuarios'       => $usuarios,
             'usuarios_stats' => $usuariosStats,
+            'centro_mando'   => $centroMando,
         ];
     }
 }

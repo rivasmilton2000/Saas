@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../models/FacturaModel.php';
 require_once __DIR__ . '/../../models/LibroModel.php';
 require_once __DIR__ . '/../../services/LibroExportService.php';
 require_once __DIR__ . '/../../services/ModuloExportService.php';
+require_once __DIR__ . '/../../services/BitacoraService.php';
 require_once __DIR__ . '/../../services/LibroVistaService.php';
 
 if (!isLoggedIn()) {
@@ -91,6 +92,25 @@ $report  = [
 ];
 
 if ($modo === 'json') {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($libro['tipo'] ?? 'libros'),
+        'exportar',
+        'Exporto un libro en formato JSON.',
+        [
+            'username'     => (string) ($_SESSION['username'] ?? ''),
+            'rol'          => (string) ($_SESSION['rol'] ?? 'user'),
+            'entidad_tipo' => 'libro',
+            'entidad_id'   => (int) ($libro['id'] ?? 0),
+            'contexto'     => [
+                'empresa' => (string) ($libro['empresa_nombre'] ?? ''),
+                'periodo' => str_pad((string) ($libro['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libro['anio'] ?? ''),
+                'formato' => 'json',
+                'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+            ],
+        ]
+    );
     header('Content-Type: application/json');
     echo json_encode([
         'success' => true,
@@ -107,16 +127,73 @@ if ($modo === 'json') {
 }
 
 if ($formato === 'excel') {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($libro['tipo'] ?? 'libros'),
+        'exportar',
+        'Exporto un libro en formato Excel.',
+        [
+            'username'     => (string) ($_SESSION['username'] ?? ''),
+            'rol'          => (string) ($_SESSION['rol'] ?? 'user'),
+            'entidad_tipo' => 'libro',
+            'entidad_id'   => (int) ($libro['id'] ?? 0),
+            'contexto'     => [
+                'empresa' => (string) ($libro['empresa_nombre'] ?? ''),
+                'periodo' => str_pad((string) ($libro['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libro['anio'] ?? ''),
+                'formato' => 'excel',
+                'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+            ],
+        ]
+    );
     ModuloExportService::descargarExcel($nombreArchivo, $report);
     exit;
 }
 
 if ($formato === 'pdf') {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($libro['tipo'] ?? 'libros'),
+        'exportar',
+        'Exporto un libro en formato PDF.',
+        [
+            'username'     => (string) ($_SESSION['username'] ?? ''),
+            'rol'          => (string) ($_SESSION['rol'] ?? 'user'),
+            'entidad_tipo' => 'libro',
+            'entidad_id'   => (int) ($libro['id'] ?? 0),
+            'contexto'     => [
+                'empresa' => (string) ($libro['empresa_nombre'] ?? ''),
+                'periodo' => str_pad((string) ($libro['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libro['anio'] ?? ''),
+                'formato' => 'pdf',
+                'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+            ],
+        ]
+    );
     ModuloExportService::descargarPdf($nombreArchivo, $report);
     exit;
 }
 
 if (($formato === 'anexo_mh_a3' || $formato === 'anexo') && ($libro['tipo'] ?? '') === 'compras') {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($libro['tipo'] ?? 'libros'),
+        'exportar',
+        'Exporto un libro en formato anexo MH A3.',
+        [
+            'username'     => (string) ($_SESSION['username'] ?? ''),
+            'rol'          => (string) ($_SESSION['rol'] ?? 'user'),
+            'entidad_tipo' => 'libro',
+            'entidad_id'   => (int) ($libro['id'] ?? 0),
+            'contexto'     => [
+                'empresa' => (string) ($libro['empresa_nombre'] ?? ''),
+                'periodo' => str_pad((string) ($libro['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libro['anio'] ?? ''),
+                'formato' => 'anexo_mh_a3',
+                'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+            ],
+        ]
+    );
     LibroExportService::descargarAnexoA3($nombreArchivo . '_anexo_mh_a3', FacturaModel::getByLibro($pdo, $idLibro));
     exit;
 }

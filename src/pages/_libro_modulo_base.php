@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config/modulos.php';
 require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
+require_once __DIR__ . '/../services/BitacoraService.php';
 require_once __DIR__ . '/../services/LibroVistaService.php';
 
 requireLogin();
@@ -55,6 +56,23 @@ $hexToRgba = static function (string $color, float $alpha) use ($toHexColor): st
 $accentColor     = $toHexColor((string) ($modulo['accent_color'] ?? '#4b49ac'));
 $accentSoft      = $hexToRgba($accentColor, 0.12);
 $accentSoftStrong = $hexToRgba($accentColor, 0.22);
+$registrarBitacora = static function (
+    string $accion,
+    string $descripcion,
+    array $opciones = []
+) use ($pdo, $idUsuario, $modulo, $session): void {
+    BitacoraService::registrar(
+        $pdo,
+        $idUsuario,
+        (string) ($modulo['tipo'] ?? 'libros'),
+        $accion,
+        $descripcion,
+        array_merge([
+            'username' => (string) ($session['username'] ?? ''),
+            'rol'      => (string) ($session['rol'] ?? 'user'),
+        ], $opciones)
+    );
+};
 
 $leerDocumentosSubidos = static function (array $files): array {
     $documentos = [];
@@ -168,6 +186,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             setActiveEmpresaId($idEmpresa);
             setActiveLibroId(null);
             EmpresaModel::marcarUltimaUsada($pdo, $idEmpresa, $idUsuario);
+            $registrarBitacora(
+                'crear_empresa',
+                'Creo la empresa ' . (string) ($validacion['data']['nombre'] ?? 'Empresa') . ' desde ' . (string) ($modulo['nombre'] ?? 'el modulo') . '.',
+                [
+                    'entidad_tipo' => 'empresa',
+                    'entidad_id'   => $idEmpresa,
+                    'contexto'     => [
+                        'empresa' => (string) ($validacion['data']['nombre'] ?? 'Empresa'),
+                    ],
+                ]
+            );
             setFlash($flashKey, 'Empresa creada correctamente.', 'success');
         }
 
@@ -187,6 +216,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             setActiveEmpresaId($idEmpresa);
             setActiveLibroId(null);
             EmpresaModel::marcarUltimaUsada($pdo, $idEmpresa, $idUsuario);
+            $registrarBitacora(
+                'seleccionar_empresa',
+                'Selecciono la empresa ' . (string) ($empresa['nombre'] ?? 'Empresa') . ' en ' . (string) ($modulo['nombre'] ?? 'el modulo') . '.',
+                [
+                    'entidad_tipo' => 'empresa',
+                    'entidad_id'   => (int) ($empresa['id'] ?? 0),
+                    'contexto'     => [
+                        'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                    ],
+                ]
+            );
             setFlash($flashKey, 'Empresa activa actualizada.', 'success');
         }
 
@@ -214,6 +254,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if ($existente) {
                 setActiveLibroId((int) $existente['id']);
                 EmpresaModel::marcarUltimaUsada($pdo, (int) $empresa['id'], $idUsuario);
+                $registrarBitacora(
+                    'abrir_libro_existente',
+                    'Abro un libro existente de ' . (string) ($modulo['nombre'] ?? 'libros') . '.',
+                    [
+                        'entidad_tipo' => 'libro',
+                        'entidad_id'   => (int) ($existente['id'] ?? 0),
+                        'contexto'     => [
+                            'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                            'periodo' => str_pad((string) $mes, 2, '0', STR_PAD_LEFT) . '/' . $anio,
+                            'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+                        ],
+                    ]
+                );
                 setFlash($flashKey, 'Ese libro ya existia. Se abrio el periodo guardado.', 'info');
             } else {
                 $idLibro = LibroModel::create($pdo, [
@@ -226,6 +279,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
                 setActiveLibroId($idLibro);
                 EmpresaModel::marcarUltimaUsada($pdo, (int) $empresa['id'], $idUsuario);
+                $registrarBitacora(
+                    'crear_libro',
+                    'Creo un libro de ' . (string) ($modulo['nombre'] ?? 'libros') . '.',
+                    [
+                        'entidad_tipo' => 'libro',
+                        'entidad_id'   => $idLibro,
+                        'contexto'     => [
+                            'empresa' => (string) ($empresa['nombre'] ?? 'Empresa'),
+                            'periodo' => str_pad((string) $mes, 2, '0', STR_PAD_LEFT) . '/' . $anio,
+                            'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+                        ],
+                    ]
+                );
                 setFlash($flashKey, 'Libro creado correctamente.', 'success');
             }
         }
@@ -250,6 +316,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } else {
             $resultado = LibroVistaService::importar($pdo, $libroActual, $idUsuario, $documentos);
             $_SESSION[$importSessionKey] = $resultado;
+            if (($resultado['success'] ?? false) === true) {
+                $registrarBitacora(
+                    'importar_json',
+                    'Importo documentos al libro ' . (string) ($modulo['nombre'] ?? 'Libro') . '.',
+                    [
+                        'entidad_tipo' => 'libro',
+                        'entidad_id'   => (int) ($libroActual['id'] ?? 0),
+                        'contexto'     => [
+                            'empresa'    => (string) ($libroActual['empresa_nombre'] ?? ''),
+                            'periodo'    => str_pad((string) ($libroActual['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libroActual['anio'] ?? ''),
+                            'libro'      => (string) ($modulo['nombre'] ?? 'Libro'),
+                            'documentos' => count($documentos),
+                            'detalle'    => 'Importadas: ' . (int) ($resultado['data']['importadas'] ?? 0),
+                        ],
+                    ]
+                );
+            }
             setFlash(
                 $flashKey,
                 (string) ($resultado['message'] ?? 'Importacion procesada.'),
@@ -274,6 +357,19 @@ if (isset($_GET['open'])) {
         setActiveEmpresaId((int) $libroAbrir['id_empresa']);
         setActiveLibroId((int) $libroAbrir['id']);
         EmpresaModel::marcarUltimaUsada($pdo, (int) $libroAbrir['id_empresa'], $idUsuario);
+        $registrarBitacora(
+            'abrir_libro',
+            'Abro un libro de ' . (string) ($modulo['nombre'] ?? 'Libro') . '.',
+            [
+                'entidad_tipo' => 'libro',
+                'entidad_id'   => (int) ($libroAbrir['id'] ?? 0),
+                'contexto'     => [
+                    'empresa' => (string) ($libroAbrir['empresa_nombre'] ?? ''),
+                    'periodo' => str_pad((string) ($libroAbrir['mes'] ?? 0), 2, '0', STR_PAD_LEFT) . '/' . (string) ($libroAbrir['anio'] ?? ''),
+                    'libro'   => (string) ($modulo['nombre'] ?? 'Libro'),
+                ],
+            ]
+        );
         setFlash($flashKey, 'Libro cargado correctamente.', 'success');
     }
 
@@ -283,6 +379,7 @@ if (isset($_GET['open'])) {
 
 if (isset($_GET['clear_book'])) {
     setActiveLibroId(null);
+    $registrarBitacora('limpiar_libro_activo', 'Limpio el libro activo de ' . (string) ($modulo['nombre'] ?? 'Libro') . '.');
     setFlash($flashKey, 'Libro activo limpiado.', 'info', [
         'open_modal' => 'book-choice',
     ]);

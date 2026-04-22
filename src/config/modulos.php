@@ -47,7 +47,7 @@ function getLibroModules(): array {
             'nombre'            => 'Ventas Consumidor Final',
             'ruta'              => 'pages/ventas_consumidor.php',
             'icono'             => 'icon-grid-2',
-            'accent_color'      => '#f59e0b',
+            'accent_color'      => '#db2777',
             'descripcion'       => 'Trabaja facturas FCF (01) y consolida ventas diarias propias.',
             'visible_sidebar'   => true,
             'visible_dashboard' => true,
