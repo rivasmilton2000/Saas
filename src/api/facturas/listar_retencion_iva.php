@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../models/LibroModel.php';
-require_once __DIR__ . '/../../services/LibroVistaService.php';
+require_once __DIR__ . '/../../services/RetencionIvaService.php';
 
 header('Content-Type: application/json');
 
@@ -26,14 +26,15 @@ if ($idLibro <= 0) {
 }
 
 $idUsuario = (int) $_SESSION['id_usuario'];
-$libro = LibroModel::getById($pdo, $idLibro, $idUsuario);
-if (!$libro) {
+$libro     = LibroModel::getById($pdo, $idLibro, $idUsuario);
+
+if (!$libro || ($libro['tipo'] ?? '') !== 'retencion_iva') {
     http_response_code(403);
     echo json_encode(['success' => false, 'data' => null, 'message' => 'Libro no encontrado o sin permiso.']);
     exit;
 }
 
-$resultado = LibroVistaService::listar($pdo, $idLibro, $idUsuario, (string) ($libro['tipo'] ?? ''));
+$resultado = RetencionIvaService::listarRetencionIva($pdo, $idLibro, $idUsuario);
 if (($resultado['success'] ?? false) !== true) {
     http_response_code(422);
 }

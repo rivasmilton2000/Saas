@@ -1,10 +1,12 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/session.php';
-require_once __DIR__ . '/../../models/LibroModel.php';
+require_once __DIR__ . '/../../config/modulos.php';
 require_once __DIR__ . '/../../models/FacturaModel.php';
+require_once __DIR__ . '/../../models/LibroModel.php';
 require_once __DIR__ . '/../../services/LibroExportService.php';
-require_once __DIR__ . '/../../services/VentasLibroService.php';
+require_once __DIR__ . '/../../services/ModuloExportService.php';
+require_once __DIR__ . '/../../services/LibroVistaService.php';
 
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -40,48 +42,64 @@ if (!$libro) {
     exit;
 }
 
-if (($libro['tipo'] ?? '') === 'ventas_consumidor') {
+$resultado = LibroVistaService::listar($pdo, $idLibro, $idUsuario, (string) ($libro['tipo'] ?? ''));
+if (($resultado['success'] ?? false) !== true) {
+    http_response_code(422);
     header('Content-Type: application/json');
-    $resultado = VentasLibroService::exportarVentasConsumidor($pdo, $idLibro, $idUsuario);
-    if (($resultado['success'] ?? false) !== true) {
-        http_response_code(422);
-    }
-
     echo json_encode([
-        'success' => (bool) ($resultado['success'] ?? false),
+        'success' => false,
         'data'    => $resultado['data'] ?? null,
-        'message' => $resultado['message'] ?? '',
+        'message' => $resultado['message'] ?? 'No se pudo preparar el libro.',
     ]);
     exit;
 }
 
-if (($libro['tipo'] ?? '') === 'ventas_contribuyente') {
-    header('Content-Type: application/json');
-    $resultado = VentasLibroService::exportarVentasContribuyente($pdo, $idLibro, $idUsuario);
-    if (($resultado['success'] ?? false) !== true) {
-        http_response_code(422);
-    }
-
-    echo json_encode([
-        'success' => (bool) ($resultado['success'] ?? false),
-        'data'    => $resultado['data'] ?? null,
-        'message' => $resultado['message'] ?? '',
-    ]);
-    exit;
-}
-
-$facturas     = FacturaModel::getByLibro($pdo, $idLibro);
+$data          = is_array($resultado['data'] ?? null) ? $resultado['data'] : [];
+$modulo        = getLibroModule((string) ($libro['tipo'] ?? '')) ?? ['nombre' => 'Libro', 'columnas' => [], 'columnas_numericas' => [], 'accent_color' => '#4b49ac'];
 $nombreArchivo = 'libro_' . $libro['tipo'] . '_' . $libro['anio'] . '_' . str_pad((string) $libro['mes'], 2, '0', STR_PAD_LEFT);
+$meses         = [
+    1 => 'Enero',
+    2 => 'Febrero',
+    3 => 'Marzo',
+    4 => 'Abril',
+    5 => 'Mayo',
+    6 => 'Junio',
+    7 => 'Julio',
+    8 => 'Agosto',
+    9 => 'Septiembre',
+    10 => 'Octubre',
+    11 => 'Noviembre',
+    12 => 'Diciembre',
+];
+$periodo = (($meses[(int) ($libro['mes'] ?? 0)] ?? (string) ($libro['mes'] ?? '')) . ' ' . (string) ($libro['anio'] ?? ''));
+$summary = LibroVistaService::construirResumenTarjetas($modulo, $resultado);
+$report  = [
+    'titulo'          => (string) ($modulo['nombre'] ?? 'Libro'),
+    'meta'            => trim((string) ($libro['empresa_nombre'] ?? '') . ' · ' . $periodo),
+    'accent_color'    => (string) ($modulo['accent_color'] ?? '#4b49ac'),
+    'summary'         => $summary,
+    'columns'         => array_map(static function ($clave, $label): array {
+        return [
+            'key'   => (string) $clave,
+            'label' => (string) $label,
+        ];
+    }, array_keys($modulo['columnas'] ?? []), array_values($modulo['columnas'] ?? [])),
+    'rows'            => $data['filas'] ?? [],
+    'numeric_keys'    => $modulo['columnas_numericas'] ?? [],
+    'total_row_index' => !empty($data['registros']) ? count($data['filas'] ?? []) - 1 : null,
+    'empty_message'   => 'No hay registros para exportar en este periodo.',
+];
 
 if ($modo === 'json') {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => true,
         'data'    => [
-            'columnas' => LibroExportService::columnas(),
-            'filas'    => LibroExportService::filas($facturas),
+            'columnas' => $report['columns'],
+            'filas'    => $report['rows'],
             'libro'    => $libro,
             'formato'  => $formato,
+            'summary'  => $summary,
         ],
         'message' => '',
     ]);
@@ -89,17 +107,17 @@ if ($modo === 'json') {
 }
 
 if ($formato === 'excel') {
-    LibroExportService::descargarExcel($nombreArchivo, $libro, $facturas);
+    ModuloExportService::descargarExcel($nombreArchivo, $report);
     exit;
 }
 
 if ($formato === 'pdf') {
-    LibroExportService::descargarPdf($nombreArchivo, $libro, $facturas);
+    ModuloExportService::descargarPdf($nombreArchivo, $report);
     exit;
 }
 
-if ($formato === 'anexo_mh_a3' || $formato === 'anexo') {
-    LibroExportService::descargarAnexoA3($nombreArchivo . '_anexo_mh_a3', $facturas);
+if (($formato === 'anexo_mh_a3' || $formato === 'anexo') && ($libro['tipo'] ?? '') === 'compras') {
+    LibroExportService::descargarAnexoA3($nombreArchivo . '_anexo_mh_a3', FacturaModel::getByLibro($pdo, $idLibro));
     exit;
 }
 

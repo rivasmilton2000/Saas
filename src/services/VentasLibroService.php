@@ -9,14 +9,17 @@ require_once __DIR__ . '/ValidadorDTE.php';
 class VentasLibroService {
 
     public static function importarVentasConsumidor(PDO $pdo, int $idLibro, int $idUsuario, array $facturas): array {
+        FacturaModel::ensureExtendedSchema($pdo);
         return self::importar($pdo, $idLibro, $idUsuario, 'ventas_consumidor', $facturas);
     }
 
     public static function importarVentasContribuyente(PDO $pdo, int $idLibro, int $idUsuario, array $facturas): array {
+        FacturaModel::ensureExtendedSchema($pdo);
         return self::importar($pdo, $idLibro, $idUsuario, 'ventas_contribuyente', $facturas);
     }
 
     public static function listarVentasConsumidor(PDO $pdo, int $idLibro, int $idUsuario): array {
+        FacturaModel::ensureExtendedSchema($pdo);
         $libro = self::obtenerLibro($pdo, $idLibro, $idUsuario, 'ventas_consumidor');
         if (!$libro) {
             return self::error('Libro no encontrado o sin permiso.');
@@ -54,6 +57,7 @@ class VentasLibroService {
     }
 
     public static function listarVentasContribuyente(PDO $pdo, int $idLibro, int $idUsuario): array {
+        FacturaModel::ensureExtendedSchema($pdo);
         $libro = self::obtenerLibro($pdo, $idLibro, $idUsuario, 'ventas_contribuyente');
         if (!$libro) {
             return self::error('Libro no encontrado o sin permiso.');

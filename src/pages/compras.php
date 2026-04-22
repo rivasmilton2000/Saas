@@ -1,4 +1,8 @@
 <?php
+$tipoLibroPagina = 'compras';
+require __DIR__ . '/_libro_modulo_base.php';
+return;
+
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../models/EmpresaModel.php';
@@ -61,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$empresa) {
             setFlash('compras', 'Primero debes seleccionar una empresa.', 'danger');
         } elseif ($mes < 1 || $mes > 12 || $anio < 2000) {
-            setFlash('compras', 'Debes elegir un mes y anio validos.', 'danger');
+            setFlash('compras', 'Debes elegir un mes y año válidos.', 'danger');
         } else {
             $existente = LibroModel::findByEmpresaTipoPeriodo($pdo, (int) $empresa['id'], 'compras', $mes, $anio);
             if ($existente) {

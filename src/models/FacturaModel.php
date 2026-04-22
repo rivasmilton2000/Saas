@@ -4,6 +4,37 @@ class FacturaModel {
 
     private static bool $schemaChecked = false;
 
+    private const EXTRA_COLUMNS = [
+        'nombre_cliente'                            => 'VARCHAR(200) NULL',
+        'nrc_cliente'                               => 'VARCHAR(20) NULL',
+        'numero_control_preimpreso'                 => 'VARCHAR(50) NULL',
+        'numero_control_interno'                    => 'VARCHAR(50) NULL',
+        'dia_emision'                               => 'DATE NULL',
+        'del_numero'                                => 'INT NULL',
+        'al_numero'                                 => 'INT NULL',
+        'codigo_generacion_desde'                   => 'VARCHAR(50) NULL',
+        'codigo_generacion_hasta'                   => 'VARCHAR(50) NULL',
+        'ventas_exentas'                            => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_internas_gravadas'                  => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'exportaciones'                             => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'total_ventas_diarias_propias'              => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_cuenta_terceros'                    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'debito_fiscal'                             => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_exentas_contribuyente'              => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_internas_gravadas_contribuyente'    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'debito_fiscal_contribuyente'               => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_totales'                            => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'nit_agente_retencion'                      => 'VARCHAR(20) NULL',
+        'fecha_emision_retencion'                   => 'DATE NULL',
+        'tipo_documento_relacionado'                => 'VARCHAR(20) NULL',
+        'serie_documento'                           => 'VARCHAR(50) NULL',
+        'numero_documento'                          => 'VARCHAR(50) NULL',
+        'monto_sujeto_retencion'                    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'retencion_iva_1'                           => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'dui_agente_retencion'                      => 'VARCHAR(20) NULL',
+        'numero_anexo'                              => 'VARCHAR(20) NULL',
+    ];
+
     public static function getByLibro(PDO $pdo, int $idLibro): array {
         $stmt = $pdo->prepare(
             "SELECT *
@@ -67,6 +98,10 @@ class FacturaModel {
         ]);
 
         return (int) $pdo->lastInsertId();
+    }
+
+    public static function ensureExtendedSchema(PDO $pdo): void {
+        self::ensureSchema($pdo);
     }
 
     public static function existeFactura(PDO $pdo, string $codigoGeneracion, int $idLibro): bool {
@@ -133,6 +168,22 @@ class FacturaModel {
         ];
     }
 
+    public static function getTotalesMensualesRetencionIva(PDO $pdo, int $idLibro): array {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COALESCE(SUM(monto_sujeto_retencion), 0) AS monto_sujeto_retencion,
+                COALESCE(SUM(retencion_iva_1), 0) AS retencion_iva_1
+             FROM facturas
+             WHERE id_libro = ?"
+        );
+        $stmt->execute([$idLibro]);
+
+        return $stmt->fetch() ?: [
+            'monto_sujeto_retencion' => 0,
+            'retencion_iva_1'        => 0,
+        ];
+    }
+
     private static function ensureSchema(PDO $pdo): void {
         if (self::$schemaChecked) {
             return;
@@ -141,12 +192,30 @@ class FacturaModel {
         self::$schemaChecked = true;
 
         try {
-            $stmt = $pdo->query("SHOW COLUMNS FROM facturas LIKE 'sello_recepcion'");
-            $columna = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
-            $tipoActual = strtolower((string) ($columna['Type'] ?? ''));
+            $stmt = $pdo->query("SHOW COLUMNS FROM facturas");
+            $columnas = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            $existentes = [];
 
-            if ($tipoActual !== '' && str_contains($tipoActual, 'varchar(50)')) {
+            foreach ($columnas as $columna) {
+                $nombre = strtolower((string) ($columna['Field'] ?? ''));
+                if ($nombre === '') {
+                    continue;
+                }
+
+                $existentes[$nombre] = strtolower((string) ($columna['Type'] ?? ''));
+            }
+
+            $tipoSello = $existentes['sello_recepcion'] ?? '';
+            if ($tipoSello !== '' && str_contains($tipoSello, 'varchar(50)')) {
                 $pdo->exec("ALTER TABLE facturas MODIFY sello_recepcion TEXT NULL");
+            }
+
+            foreach (self::EXTRA_COLUMNS as $columna => $definicion) {
+                if (array_key_exists($columna, $existentes)) {
+                    continue;
+                }
+
+                $pdo->exec("ALTER TABLE facturas ADD COLUMN {$columna} {$definicion}");
             }
         } catch (Throwable $exception) {
             // Si no se puede alterar la tabla, continuamos con el esquema actual.

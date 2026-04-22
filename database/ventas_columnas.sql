@@ -19,7 +19,16 @@ ALTER TABLE facturas
     ADD COLUMN IF NOT EXISTS ventas_exentas_contribuyente DECIMAL(10,2) DEFAULT 0.00,
     ADD COLUMN IF NOT EXISTS ventas_internas_gravadas_contribuyente DECIMAL(10,2) DEFAULT 0.00,
     ADD COLUMN IF NOT EXISTS debito_fiscal_contribuyente DECIMAL(10,2) DEFAULT 0.00,
-    ADD COLUMN IF NOT EXISTS ventas_totales DECIMAL(10,2) DEFAULT 0.00;
+    ADD COLUMN IF NOT EXISTS ventas_totales DECIMAL(10,2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS nit_agente_retencion VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS fecha_emision_retencion DATE,
+    ADD COLUMN IF NOT EXISTS tipo_documento_relacionado VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS serie_documento VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS numero_documento VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS monto_sujeto_retencion DECIMAL(10,2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS retencion_iva_1 DECIMAL(10,2) DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS dui_agente_retencion VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS numero_anexo VARCHAR(20);
 
 ALTER TABLE empresas
     ADD COLUMN IF NOT EXISTS ultima_vez_usada TIMESTAMP NULL;

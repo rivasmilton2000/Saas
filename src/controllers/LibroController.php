@@ -58,7 +58,7 @@ class LibroController {
             echo json_encode([
                 'success' => false,
                 'data'    => null,
-                'message' => 'Debes enviar id_empresa, tipo, mes y anio validos.',
+                'message' => 'Debes enviar id_empresa, tipo, mes y año válidos.',
             ]);
             return;
         }

@@ -2,8 +2,7 @@
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../models/LibroModel.php';
-require_once __DIR__ . '/../../services/LibroImportService.php';
-require_once __DIR__ . '/../../services/VentasLibroService.php';
+require_once __DIR__ . '/../../services/LibroVistaService.php';
 
 header('Content-Type: application/json');
 
@@ -44,25 +43,7 @@ if (!$libro) {
     exit;
 }
 
-if (($libro['tipo'] ?? '') === 'ventas_consumidor') {
-    $resultado = VentasLibroService::importarVentasConsumidor($pdo, $idLibro, $idUsuario, $documentos);
-} elseif (($libro['tipo'] ?? '') === 'ventas_contribuyente') {
-    $resultado = VentasLibroService::importarVentasContribuyente($pdo, $idLibro, $idUsuario, $documentos);
-} else {
-    $normalizados = [];
-    foreach ($documentos as $indice => $payload) {
-        if (!is_array($payload)) {
-            continue;
-        }
-
-        $normalizados[] = [
-            'archivo' => 'documento_' . ($indice + 1) . '.json',
-            'payload' => $payload,
-        ];
-    }
-
-    $resultado = LibroImportService::importarDocumentos($pdo, $idLibro, $idUsuario, $normalizados);
-}
+$resultado = LibroVistaService::importar($pdo, $libro, $idUsuario, $documentos);
 
 if (($resultado['success'] ?? false) === false) {
     http_response_code(422);
