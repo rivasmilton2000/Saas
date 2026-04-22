@@ -10,7 +10,7 @@ class ValidadorDTE {
     ];
 
     private static array $nombres = [
-        '01' => 'Factura de Consumidor Final',
+        '01' => 'Factura Consumidor Final',
         '03' => 'Comprobante de Credito Fiscal',
         '05' => 'Nota de Credito',
         '06' => 'Nota de Debito',
@@ -36,6 +36,6 @@ class ValidadorDTE {
     }
 
     public static function getNombreTipo(string $tipoDte): string {
-        return self::$nombres[$tipoDte] ?? $tipoDte;
+        return self::$nombres[$tipoDte] ?? 'Desconocido';
     }
 }

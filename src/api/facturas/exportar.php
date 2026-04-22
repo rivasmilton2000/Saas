@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../models/LibroModel.php';
 require_once __DIR__ . '/../../models/FacturaModel.php';
 require_once __DIR__ . '/../../services/LibroExportService.php';
+require_once __DIR__ . '/../../services/VentasLibroService.php';
 
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -30,11 +31,42 @@ if ($idLibro <= 0) {
     exit;
 }
 
-$libro = LibroModel::getById($pdo, $idLibro, (int) $_SESSION['id_usuario']);
+$idUsuario = (int) $_SESSION['id_usuario'];
+$libro = LibroModel::getById($pdo, $idLibro, $idUsuario);
 if (!$libro) {
     http_response_code(403);
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'data' => null, 'message' => 'Libro no encontrado o sin permiso.']);
+    exit;
+}
+
+if (($libro['tipo'] ?? '') === 'ventas_consumidor') {
+    header('Content-Type: application/json');
+    $resultado = VentasLibroService::exportarVentasConsumidor($pdo, $idLibro, $idUsuario);
+    if (($resultado['success'] ?? false) !== true) {
+        http_response_code(422);
+    }
+
+    echo json_encode([
+        'success' => (bool) ($resultado['success'] ?? false),
+        'data'    => $resultado['data'] ?? null,
+        'message' => $resultado['message'] ?? '',
+    ]);
+    exit;
+}
+
+if (($libro['tipo'] ?? '') === 'ventas_contribuyente') {
+    header('Content-Type: application/json');
+    $resultado = VentasLibroService::exportarVentasContribuyente($pdo, $idLibro, $idUsuario);
+    if (($resultado['success'] ?? false) !== true) {
+        http_response_code(422);
+    }
+
+    echo json_encode([
+        'success' => (bool) ($resultado['success'] ?? false),
+        'data'    => $resultado['data'] ?? null,
+        'message' => $resultado['message'] ?? '',
+    ]);
     exit;
 }
 

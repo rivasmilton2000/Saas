@@ -9,8 +9,16 @@ class EmpresaController {
         requireLogin();
 
         global $pdo;
-        $session  = sessionData();
-        $empresas = EmpresaModel::getByUsuario($pdo, (int) $session['id_usuario']);
+        $session     = sessionData();
+        $idUsuario   = (int) $session['id_usuario'];
+        $empresas    = EmpresaModel::getByUsuario($pdo, $idUsuario);
+        $ultimaUsada = EmpresaModel::getUltimaUsada($pdo, $idUsuario);
+        $idUltima    = (int) ($ultimaUsada['id'] ?? 0);
+
+        $empresas = array_map(static function (array $empresa) use ($idUltima): array {
+            $empresa['es_ultima_usada'] = $idUltima > 0 && (int) ($empresa['id'] ?? 0) === $idUltima;
+            return $empresa;
+        }, $empresas);
 
         echo json_encode([
             'success' => true,

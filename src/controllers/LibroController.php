@@ -23,6 +23,8 @@ class LibroController {
                 return;
             }
 
+            EmpresaModel::marcarUltimaUsada($pdo, $idEmpresa, $idUsuario);
+
             $libros = $tipo !== ''
                 ? LibroModel::getByEmpresaYTipo($pdo, $idEmpresa, $tipo)
                 : LibroModel::getByEmpresa($pdo, $idEmpresa);
@@ -73,6 +75,8 @@ class LibroController {
             echo json_encode(['success' => false, 'data' => null, 'message' => 'Empresa no encontrada o sin permiso.']);
             return;
         }
+
+        EmpresaModel::marcarUltimaUsada($pdo, $idEmpresa, $idUsuario);
 
         $existente = LibroModel::findByEmpresaTipoPeriodo($pdo, $idEmpresa, $tipo, $mes, $anio);
         if ($existente) {

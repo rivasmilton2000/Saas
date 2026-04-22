@@ -2,7 +2,11 @@
 
 class EmpresaModel {
 
+    private static bool $schemaChecked = false;
+
     public static function getByUsuario(PDO $pdo, int $idUsuario): array {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
             "SELECT *
              FROM empresas
@@ -15,6 +19,8 @@ class EmpresaModel {
     }
 
     public static function getById(PDO $pdo, int $idEmpresa, int $idUsuario): ?array {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
             "SELECT *
              FROM empresas
@@ -59,6 +65,42 @@ class EmpresaModel {
         ]);
 
         return (int) $pdo->lastInsertId();
+    }
+
+    public static function marcarUltimaUsada(PDO $pdo, int $idEmpresa, int $idUsuario): void {
+        self::ensureSchema($pdo);
+        try {
+            $stmt = $pdo->prepare(
+                "UPDATE empresas
+                 SET ultima_vez_usada = NOW()
+                 WHERE id = ? AND id_usuario = ?"
+            );
+            $stmt->execute([$idEmpresa, $idUsuario]);
+        } catch (Throwable $exception) {
+            // Si la columna no existe todavia, no bloqueamos el flujo principal.
+        }
+    }
+
+    public static function getUltimaUsada(PDO $pdo, int $idUsuario): ?array {
+        self::ensureSchema($pdo);
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT *
+                 FROM empresas
+                 WHERE id_usuario = ? AND estado = 1
+                 ORDER BY
+                    CASE WHEN ultima_vez_usada IS NULL THEN 1 ELSE 0 END,
+                    ultima_vez_usada DESC,
+                    id DESC
+                 LIMIT 1"
+            );
+            $stmt->execute([$idUsuario]);
+
+            $empresa = $stmt->fetch();
+            return $empresa ?: null;
+        } catch (Throwable $exception) {
+            return null;
+        }
     }
 
     public static function delete(PDO $pdo, int $idEmpresa, int $idUsuario): bool {
@@ -177,5 +219,24 @@ class EmpresaModel {
     private static function nullable($value): ?string {
         $value = trim((string) $value);
         return $value === '' ? null : $value;
+    }
+
+    private static function ensureSchema(PDO $pdo): void {
+        if (self::$schemaChecked) {
+            return;
+        }
+
+        self::$schemaChecked = true;
+
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM empresas LIKE 'ultima_vez_usada'");
+            $columna = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+
+            if (!$columna) {
+                $pdo->exec("ALTER TABLE empresas ADD COLUMN ultima_vez_usada TIMESTAMP NULL");
+            }
+        } catch (Throwable $exception) {
+            // Si no se puede alterar la tabla, mantenemos el comportamiento actual.
+        }
     }
 }

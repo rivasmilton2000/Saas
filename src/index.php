@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/config/modulos.php';
 require_once __DIR__ . '/controllers/DashboardController.php';
 require_once __DIR__ . '/models/EmpresaModel.php';
 require_once __DIR__ . '/models/UsuarioModel.php';
@@ -204,6 +205,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $data = DashboardController::getData($idUsuario);
+$modulosLibros = array_filter(
+    getLibroModules(),
+    static fn(array $modulo): bool => ($modulo['visible_dashboard'] ?? false) === true
+);
 $flash = getFlash('dashboard');
 $flashMeta = $flash['meta'] ?? [];
 $companyFormData = array_merge([
@@ -851,11 +856,11 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
               <div class="col-lg-8 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Ver mis libros</h4>
-                    <p class="card-description">Entra al modulo de Libro de Compras y trabaja con tu empresa activa.</p>
+                    <h4 class="card-title">Ver mis módulos</h4>
+                    <p class="card-description">Accede a compras y ventas desde la misma empresa activa, con visibilidad rápida por tipo de libro.</p>
                     <div class="mb-3">
                       <strong>Empresas registradas:</strong> <?php echo count($data['empresas']); ?><br>
-                      <strong>Libros de compras:</strong> <?php echo (int) $data['libros_count']; ?><br>
+                      <strong>Libros totales:</strong> <?php echo (int) $data['libros_count']; ?><br>
                       <strong>Facturas disponibles:</strong> <?php echo (int) ($data['cuota']['disponibles'] ?? 0); ?> de <?php echo (int) ($data['cuota']['total'] ?? 0); ?>
                     </div>
 
@@ -865,6 +870,23 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
                     </div>
                     <?php endif; ?>
 
+                    <div class="row mb-3">
+                      <?php foreach ($modulosLibros as $tipoModulo => $modulo): ?>
+                      <div class="col-md-4 mb-3">
+                        <div class="border rounded p-3 h-100">
+                          <h6 class="mb-2"><?php echo htmlspecialchars((string) $modulo['nombre']); ?></h6>
+                          <p class="text-muted mb-2"><?php echo htmlspecialchars((string) ($modulo['descripcion'] ?? '')); ?></p>
+                          <div class="mb-3">
+                            <strong>Libros:</strong> <?php echo (int) ($data['libros_by_type'][$tipoModulo] ?? 0); ?>
+                          </div>
+                          <?php if (!empty($modulo['ruta'])): ?>
+                          <a href="<?php echo htmlspecialchars((string) $modulo['ruta']); ?>" class="btn btn-outline-primary btn-sm">Abrir módulo</a>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                      <?php endforeach; ?>
+                    </div>
+
                     <?php if (!empty($data['libros'])): ?>
                     <div class="table-responsive mb-3">
                       <table class="table table-sm">
@@ -873,24 +895,39 @@ $empresaActivaNavbar = $data['empresa_activa'] ?? null;
                             <th>Empresa</th>
                             <th>Periodo</th>
                             <th>Tipo</th>
+                            <th>Acceso</th>
                           </tr>
                         </thead>
                         <tbody>
                           <?php foreach (array_slice($data['libros'], 0, 5) as $libro): ?>
+                          <?php $moduloLibro = getLibroModule((string) ($libro['tipo'] ?? '')); ?>
                           <tr>
                             <td><?php echo htmlspecialchars((string) $libro['empresa_nombre']); ?></td>
                             <td><?php echo str_pad((string) $libro['mes'], 2, '0', STR_PAD_LEFT) . '/' . htmlspecialchars((string) $libro['anio']); ?></td>
-                            <td><?php echo htmlspecialchars((string) $libro['tipo']); ?></td>
+                            <td><?php echo htmlspecialchars((string) ($moduloLibro['nombre'] ?? $libro['tipo'])); ?></td>
+                            <td>
+                              <?php if (!empty($moduloLibro['ruta'])): ?>
+                              <a href="<?php echo htmlspecialchars((string) $moduloLibro['ruta']); ?>" class="btn btn-outline-secondary btn-sm">Ir</a>
+                              <?php else: ?>
+                              <span class="text-muted">Sin vista</span>
+                              <?php endif; ?>
+                            </td>
                           </tr>
                           <?php endforeach; ?>
                         </tbody>
                       </table>
                     </div>
                     <?php else: ?>
-                    <p class="text-muted">Todavia no has creado libros de compras.</p>
+                    <p class="text-muted">Todavía no has creado libros en ninguno de los módulos habilitados.</p>
                     <?php endif; ?>
 
-                    <a href="pages/compras.php" class="btn btn-outline-primary">Ir a mis libros</a>
+                    <div class="d-flex flex-wrap gap-2">
+                      <?php foreach ($modulosLibros as $modulo): ?>
+                      <?php if (!empty($modulo['ruta'])): ?>
+                      <a href="<?php echo htmlspecialchars((string) $modulo['ruta']); ?>" class="btn btn-outline-primary"><?php echo htmlspecialchars((string) $modulo['nombre']); ?></a>
+                      <?php endif; ?>
+                      <?php endforeach; ?>
+                    </div>
                   </div>
                 </div>
               </div>

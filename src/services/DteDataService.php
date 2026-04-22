@@ -3,6 +3,7 @@
 class DteDataService {
 
     public static function extractDocumentoData(array $payload): array {
+        $payload         = self::normalizeDocumentPayload($payload);
         $identificacion = self::arrayValue($payload, 'identificacion');
         $emisor         = self::arrayValue($payload, 'emisor');
         $receptor       = self::arrayValue($payload, 'receptor');
@@ -24,11 +25,20 @@ class DteDataService {
                 ['selloRecepcion'],
                 ['identificacion', 'selloRecepcion'],
                 ['identificacion', 'selloRecibido'],
+                ['identificacion', 'sello'],
                 ['respuestaMH', 'selloRecepcion'],
                 ['respuestaMH', 'selloRecibido'],
+                ['respuestaMH', 'sello'],
                 ['recepcion', 'selloRecepcion'],
                 ['recepcion', 'selloRecibido'],
-            ], ['sellorecepcion', 'sellorecibido', 'sellorecepcionmh', 'sellorecibidomh']),
+                ['recepcion', 'sello'],
+                ['procesamiento', 'selloRecepcion'],
+                ['procesamiento', 'selloRecibido'],
+                ['procesamiento', 'sello'],
+                ['respuesta', 'selloRecepcion'],
+                ['respuesta', 'selloRecibido'],
+                ['respuesta', 'sello'],
+            ], ['sellorecepcion', 'sellorecibido', 'sellorecepcionmh', 'sellorecibidomh', 'selloderecepcion']),
             'numero_control'             => self::extractFirstText($payload, [
                 ['numeroControl'],
                 ['identificacion', 'numeroControl'],
@@ -204,6 +214,11 @@ class DteDataService {
         return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     }
 
+    public static function normalizeDocumentPayload(array $payload): array {
+        $normalizado = self::unwrapDocumentPayload($payload);
+        return is_array($normalizado) ? $normalizado : $payload;
+    }
+
     private static function extractFirstText(array $payload, array $paths, array $normalizedKeys): ?string {
         $candidatos = self::collectCandidates($payload, $paths, $normalizedKeys);
         return self::firstNonEmpty($candidatos);
@@ -293,6 +308,11 @@ class DteDataService {
         }
 
         if (is_array($value)) {
+            $leafs = self::collectScalarLeafValues($value);
+            if (!empty($leafs)) {
+                return self::longestNonEmpty($leafs);
+            }
+
             return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
@@ -307,6 +327,130 @@ class DteDataService {
 
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private static function unwrapDocumentPayload(array $payload, int $depth = 0): array {
+        if ($depth > 8 || $payload === []) {
+            return $payload;
+        }
+
+        if (self::looksLikeDocument($payload)) {
+            return $payload;
+        }
+
+        $wrapperKeys = [
+            'dteJson',
+            'dte',
+            'documento',
+            'documentoFiscal',
+            'comprobante',
+            'payload',
+            'body',
+            'data',
+            'result',
+            'resultado',
+            'respuesta',
+            'contenido',
+            'archivo',
+            'item',
+        ];
+
+        foreach ($wrapperKeys as $key) {
+            if (!array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $candidate = self::normalizePossibleDocument($payload[$key], $depth + 1);
+            if (is_array($candidate) && self::looksLikeDocument($candidate)) {
+                return $candidate;
+            }
+        }
+
+        foreach ($payload as $value) {
+            $candidate = self::normalizePossibleDocument($value, $depth + 1);
+            if (is_array($candidate) && self::looksLikeDocument($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $payload;
+    }
+
+    private static function normalizePossibleDocument($value, int $depth) {
+        if ($depth > 8) {
+            return is_array($value) ? $value : null;
+        }
+
+        if (is_string($value)) {
+            $decoded = self::decodeJsonText($value);
+            if (is_array($decoded)) {
+                return self::unwrapDocumentPayload($decoded, $depth + 1);
+            }
+            return null;
+        }
+
+        if (!is_array($value)) {
+            return null;
+        }
+
+        if (self::esLista($value)) {
+            foreach ($value as $item) {
+                $candidate = self::normalizePossibleDocument($item, $depth + 1);
+                if (is_array($candidate) && self::looksLikeDocument($candidate)) {
+                    return $candidate;
+                }
+            }
+            return $value;
+        }
+
+        return self::unwrapDocumentPayload($value, $depth + 1);
+    }
+
+    private static function looksLikeDocument(array $payload): bool {
+        $keys = [
+            'identificacion',
+            'resumen',
+            'emisor',
+            'receptor',
+            'sujetoExcluido',
+            'codigoGeneracion',
+            'tipoDte',
+            'numeroControl',
+            'selloRecepcion',
+            'selloRecibido',
+        ];
+
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function decodeJsonText(string $text): ?array {
+        $text = preg_replace('/^\xEF\xBB\xBF/', '', trim($text));
+        if ($text === '') {
+            return null;
+        }
+
+        $firstChar = substr($text, 0, 1);
+        if ($firstChar !== '{' && $firstChar !== '[' && $firstChar !== '"') {
+            return null;
+        }
+
+        $decoded = json_decode($text, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if (is_string($decoded)) {
+            $decodedNested = json_decode($decoded, true);
+            return is_array($decodedNested) ? $decodedNested : null;
+        }
+
+        return null;
     }
 
     private static function normalizeKey(string $key): string {
@@ -366,5 +510,29 @@ class DteDataService {
 
         $timestamp = strtotime($date);
         return $timestamp ? date('Y-m-d', $timestamp) : date('Y-m-d');
+    }
+
+    private static function esLista(array $value): bool {
+        return array_keys($value) === range(0, count($value) - 1);
+    }
+
+    private static function collectScalarLeafValues(array $value): array {
+        $result = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $result = array_merge($result, self::collectScalarLeafValues($item));
+                continue;
+            }
+
+            if (is_scalar($item)) {
+                $texto = self::nullable($item);
+                if ($texto !== null) {
+                    $result[] = $texto;
+                }
+            }
+        }
+
+        return array_values(array_unique($result));
     }
 }

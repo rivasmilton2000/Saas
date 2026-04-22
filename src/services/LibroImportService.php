@@ -161,8 +161,8 @@ class LibroImportService {
                 continue;
             }
 
-            $json = json_decode($contenido, true);
-            if (json_last_error() !== JSON_ERROR_NONE || !is_array($json)) {
+            $json = DteDataService::decodeJsonText($contenido);
+            if (!is_array($json)) {
                 $errores[] = [
                     'archivo' => $nombreArchivo,
                     'razon'   => 'El archivo no contiene un JSON valido.',
@@ -279,15 +279,60 @@ class LibroImportService {
     }
 
     private static function expandirDocumento(array $json): array {
+        $json = DteDataService::normalizeDocumentPayload($json);
+
         if (self::esLista($json)) {
-            return array_values(array_filter($json, 'is_array'));
+            $documentos = [];
+            foreach ($json as $item) {
+                if (is_string($item)) {
+                    $item = DteDataService::decodeJsonText($item);
+                }
+
+                if (!is_array($item)) {
+                    continue;
+                }
+                $documentos[] = DteDataService::normalizeDocumentPayload($item);
+            }
+            return $documentos;
         }
 
-        if (isset($json['facturas']) && is_array($json['facturas']) && self::esLista($json['facturas'])) {
-            return array_values(array_filter($json['facturas'], 'is_array'));
+        $listKeys = [
+            'facturas',
+            'documentos',
+            'dtes',
+            'comprobantes',
+            'items',
+            'detalle',
+            'data',
+            'resultado',
+            'lote',
+            'loteDte',
+        ];
+
+        foreach ($listKeys as $key) {
+            if (!isset($json[$key]) || !is_array($json[$key]) || !self::esLista($json[$key])) {
+                continue;
+            }
+
+            $documentos = [];
+            foreach ($json[$key] as $item) {
+                if (is_string($item)) {
+                    $item = DteDataService::decodeJsonText($item);
+                }
+
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $documentos[] = DteDataService::normalizeDocumentPayload($item);
+            }
+
+            if (!empty($documentos)) {
+                return $documentos;
+            }
         }
 
-        return [$json];
+        return [DteDataService::normalizeDocumentPayload($json)];
     }
     private static function esLista(array $value): bool {
         return array_keys($value) === range(0, count($value) - 1);

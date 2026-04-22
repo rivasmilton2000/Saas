@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../models/LibroModel.php';
 require_once __DIR__ . '/../../services/LibroImportService.php';
+require_once __DIR__ . '/../../services/VentasLibroService.php';
 
 header('Content-Type: application/json');
 
@@ -33,26 +35,46 @@ if ($idLibro <= 0 || !is_array($documentos)) {
     exit;
 }
 
-$normalizados = [];
-foreach ($documentos as $indice => $payload) {
-    if (!is_array($payload)) {
-        continue;
-    }
+$idUsuario = (int) $_SESSION['id_usuario'];
+$libro     = LibroModel::getById($pdo, $idLibro, $idUsuario);
 
-    $normalizados[] = [
-        'archivo' => 'documento_' . ($indice + 1) . '.json',
-        'payload' => $payload,
-    ];
+if (!$libro) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'data' => null, 'message' => 'Libro no encontrado o sin permiso.']);
+    exit;
 }
 
-$resultado = LibroImportService::importarDocumentos($pdo, $idLibro, (int) $_SESSION['id_usuario'], $normalizados);
+if (($libro['tipo'] ?? '') === 'ventas_consumidor') {
+    $resultado = VentasLibroService::importarVentasConsumidor($pdo, $idLibro, $idUsuario, $documentos);
+} elseif (($libro['tipo'] ?? '') === 'ventas_contribuyente') {
+    $resultado = VentasLibroService::importarVentasContribuyente($pdo, $idLibro, $idUsuario, $documentos);
+} else {
+    $normalizados = [];
+    foreach ($documentos as $indice => $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $normalizados[] = [
+            'archivo' => 'documento_' . ($indice + 1) . '.json',
+            'payload' => $payload,
+        ];
+    }
+
+    $resultado = LibroImportService::importarDocumentos($pdo, $idLibro, $idUsuario, $normalizados);
+}
 
 if (($resultado['success'] ?? false) === false) {
     http_response_code(422);
 }
 
+$data = $resultado['data'] ?? $resultado;
+if (is_array($data)) {
+    unset($data['success'], $data['message']);
+}
+
 echo json_encode([
     'success' => (bool) ($resultado['success'] ?? false),
-    'data'    => $resultado,
+    'data'    => $data,
     'message' => $resultado['message'] ?? '',
 ]);

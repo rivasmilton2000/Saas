@@ -87,6 +87,52 @@ class FacturaModel {
         return (int) $stmt->fetchColumn();
     }
 
+    public static function getTotalesMensualesVentasConsumidor(PDO $pdo, int $idLibro): array {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COALESCE(SUM(ventas_exentas), 0) AS ventas_exentas,
+                COALESCE(SUM(ventas_internas_gravadas), 0) AS ventas_internas_gravadas,
+                COALESCE(SUM(exportaciones), 0) AS exportaciones,
+                COALESCE(SUM(total_ventas_diarias_propias), 0) AS total_ventas_diarias_propias,
+                COALESCE(SUM(ventas_cuenta_terceros), 0) AS ventas_cuenta_terceros
+             FROM facturas
+             WHERE id_libro = ?"
+        );
+        $stmt->execute([$idLibro]);
+
+        return $stmt->fetch() ?: [
+            'ventas_exentas'               => 0,
+            'ventas_internas_gravadas'     => 0,
+            'exportaciones'                => 0,
+            'total_ventas_diarias_propias' => 0,
+            'ventas_cuenta_terceros'       => 0,
+        ];
+    }
+
+    public static function getTotalesMensualesVentasContribuyente(PDO $pdo, int $idLibro): array {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COALESCE(SUM(ventas_exentas_contribuyente), 0) AS ventas_exentas_contribuyente,
+                COALESCE(SUM(ventas_internas_gravadas_contribuyente), 0) AS ventas_internas_gravadas_contribuyente,
+                COALESCE(SUM(debito_fiscal_contribuyente), 0) AS debito_fiscal_contribuyente,
+                COALESCE(SUM(iva_percibido), 0) AS iva_percibido,
+                COALESCE(SUM(iva_retenido), 0) AS iva_retenido,
+                COALESCE(SUM(ventas_totales), 0) AS ventas_totales
+             FROM facturas
+             WHERE id_libro = ?"
+        );
+        $stmt->execute([$idLibro]);
+
+        return $stmt->fetch() ?: [
+            'ventas_exentas_contribuyente'           => 0,
+            'ventas_internas_gravadas_contribuyente' => 0,
+            'debito_fiscal_contribuyente'            => 0,
+            'iva_percibido'                          => 0,
+            'iva_retenido'                           => 0,
+            'ventas_totales'                         => 0,
+        ];
+    }
+
     private static function ensureSchema(PDO $pdo): void {
         if (self::$schemaChecked) {
             return;
