@@ -3,9 +3,26 @@
 class UsuarioModel {
 
     private const ROLES = ['admin', 'user'];
+    private static bool $schemaChecked = false;
+
+    public static function ensureSchema(PDO $pdo): void {
+        if (self::$schemaChecked) {
+            return;
+        }
+
+        $pdo->exec(
+            "ALTER TABLE usuarios
+                ADD COLUMN IF NOT EXISTS nombre_completo VARCHAR(150) NULL AFTER username,
+                ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(255) NULL AFTER nombre_completo"
+        );
+
+        self::$schemaChecked = true;
+    }
 
     public static function getById(PDO $pdo, int $idUsuario, bool $onlyActive = true): ?array {
-        $sql = "SELECT id, username, password, rol, estado, created_at
+        self::ensureSchema($pdo);
+
+        $sql = "SELECT id, username, nombre_completo, foto_perfil, password, rol, estado, created_at
                 FROM usuarios
                 WHERE id = ?";
 
@@ -23,8 +40,10 @@ class UsuarioModel {
     }
 
     public static function getByUsername(PDO $pdo, string $username): ?array {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
-            "SELECT id, username, password, rol, estado, created_at
+            "SELECT id, username, nombre_completo, foto_perfil, password, rol, estado, created_at
              FROM usuarios
              WHERE LOWER(username) = LOWER(?)
              LIMIT 1"
@@ -36,8 +55,10 @@ class UsuarioModel {
     }
 
     public static function getActivos(PDO $pdo): array {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->query(
-            "SELECT id, username, rol, estado, created_at
+            "SELECT id, username, nombre_completo, foto_perfil, rol, estado, created_at
              FROM usuarios
              WHERE estado = 1
              ORDER BY FIELD(rol, 'admin', 'user'), username ASC"
@@ -47,6 +68,8 @@ class UsuarioModel {
     }
 
     public static function getResumen(PDO $pdo): array {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->query(
             "SELECT
                 COUNT(*) AS total,
@@ -66,6 +89,8 @@ class UsuarioModel {
     }
 
     public static function countAdmins(PDO $pdo, ?int $excludeId = null): int {
+        self::ensureSchema($pdo);
+
         $sql = "SELECT COUNT(*)
                 FROM usuarios
                 WHERE rol = 'admin' AND estado = 1";
@@ -211,12 +236,16 @@ class UsuarioModel {
     }
 
     public static function create(PDO $pdo, array $data): int {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
-            "INSERT INTO usuarios (username, password, rol, estado)
-             VALUES (?, ?, ?, ?)"
+            "INSERT INTO usuarios (username, nombre_completo, foto_perfil, password, rol, estado)
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             trim((string) $data['username']),
+            self::nullableText($data['nombre_completo'] ?? null),
+            self::nullableText($data['foto_perfil'] ?? null),
             (string) $data['password'],
             self::normalizeRole($data['rol'] ?? 'user'),
             isset($data['estado']) ? (int) $data['estado'] : 1,
@@ -226,12 +255,19 @@ class UsuarioModel {
     }
 
     public static function update(PDO $pdo, int $idUsuario, array $data): bool {
+        self::ensureSchema($pdo);
+        $usuarioActual = self::getById($pdo, $idUsuario, false);
+
         $fields = [
             'username = ?',
+            'nombre_completo = ?',
+            'foto_perfil = ?',
             'rol = ?',
         ];
         $params = [
             trim((string) $data['username']),
+            self::nullableText($data['nombre_completo'] ?? ($usuarioActual['nombre_completo'] ?? null)),
+            self::nullableText($data['foto_perfil'] ?? ($usuarioActual['foto_perfil'] ?? null)),
             self::normalizeRole($data['rol'] ?? 'user'),
         ];
 
@@ -252,6 +288,8 @@ class UsuarioModel {
     }
 
     public static function deactivate(PDO $pdo, int $idUsuario): bool {
+        self::ensureSchema($pdo);
+
         $stmt = $pdo->prepare(
             "UPDATE usuarios
              SET estado = 0
@@ -272,7 +310,42 @@ class UsuarioModel {
         return in_array($fallback, self::ROLES, true) ? $fallback : 'user';
     }
 
+    public static function updateOwnProfile(PDO $pdo, int $idUsuario, array $data): bool {
+        self::ensureSchema($pdo);
+
+        $fields = [
+            'username = ?',
+            'nombre_completo = ?',
+        ];
+        $params = [
+            trim((string) ($data['username'] ?? '')),
+            self::nullableText($data['nombre_completo'] ?? null),
+        ];
+
+        if (array_key_exists('foto_perfil', $data)) {
+            $fields[] = 'foto_perfil = ?';
+            $params[] = self::nullableText($data['foto_perfil']);
+        }
+
+        if (!empty($data['password'])) {
+            $fields[] = 'password = ?';
+            $params[] = (string) $data['password'];
+        }
+
+        $params[] = $idUsuario;
+
+        $stmt = $pdo->prepare(
+            "UPDATE usuarios
+             SET " . implode(', ', $fields) . "
+             WHERE id = ? AND estado = 1"
+        );
+
+        return $stmt->execute($params);
+    }
+
     private static function usernameExists(PDO $pdo, string $username, ?int $excludeId = null): bool {
+        self::ensureSchema($pdo);
+
         $sql = "SELECT id
                 FROM usuarios
                 WHERE LOWER(username) = LOWER(?) AND estado = 1";
@@ -323,5 +396,10 @@ class UsuarioModel {
         }
 
         return null;
+    }
+
+    private static function nullableText($value): ?string {
+        $value = trim((string) $value);
+        return $value !== '' ? $value : null;
     }
 }
