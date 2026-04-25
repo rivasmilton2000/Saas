@@ -5,34 +5,34 @@ class FacturaModel {
     private static bool $schemaChecked = false;
 
     private const EXTRA_COLUMNS = [
-        'nombre_cliente'                         => 'VARCHAR(200) NULL',
-        'nrc_cliente'                            => 'VARCHAR(20) NULL',
-        'numero_control_preimpreso'              => 'VARCHAR(50) NULL',
-        'numero_control_interno'                 => 'VARCHAR(50) NULL',
-        'dia_emision'                            => 'DATE NULL',
-        'del_numero'                             => 'INT NULL',
-        'al_numero'                              => 'INT NULL',
-        'codigo_generacion_desde'                => 'VARCHAR(50) NULL',
-        'codigo_generacion_hasta'                => 'VARCHAR(50) NULL',
-        'ventas_exentas'                         => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'ventas_internas_gravadas'               => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'exportaciones'                          => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'total_ventas_diarias_propias'           => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'ventas_cuenta_terceros'                 => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'debito_fiscal'                          => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'ventas_exentas_contribuyente'           => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'ventas_internas_gravadas_contribuyente' => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'debito_fiscal_contribuyente'            => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'ventas_totales'                         => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'nit_agente_retencion'                   => 'VARCHAR(20) NULL',
-        'fecha_emision_retencion'                => 'DATE NULL',
-        'tipo_documento_relacionado'             => 'VARCHAR(20) NULL',
-        'serie_documento'                        => 'VARCHAR(50) NULL',
-        'numero_documento'                       => 'VARCHAR(50) NULL',
-        'monto_sujeto_retencion'                 => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'retencion_iva_1'                        => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
-        'dui_agente_retencion'                   => 'VARCHAR(20) NULL',
-        'numero_anexo'                           => 'VARCHAR(20) NULL',
+        'nombre_cliente'                            => 'VARCHAR(200) NULL',
+        'nrc_cliente'                               => 'VARCHAR(20) NULL',
+        'numero_control_preimpreso'                 => 'VARCHAR(50) NULL',
+        'numero_control_interno'                    => 'VARCHAR(50) NULL',
+        'dia_emision'                               => 'DATE NULL',
+        'del_numero'                                => 'INT NULL',
+        'al_numero'                                 => 'INT NULL',
+        'codigo_generacion_desde'                   => 'VARCHAR(50) NULL',
+        'codigo_generacion_hasta'                   => 'VARCHAR(50) NULL',
+        'ventas_exentas'                            => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_internas_gravadas'                  => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'exportaciones'                             => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'total_ventas_diarias_propias'              => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_cuenta_terceros'                    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'debito_fiscal'                             => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_exentas_contribuyente'              => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_internas_gravadas_contribuyente'    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'debito_fiscal_contribuyente'               => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'ventas_totales'                            => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'nit_agente_retencion'                      => 'VARCHAR(20) NULL',
+        'fecha_emision_retencion'                   => 'DATE NULL',
+        'tipo_documento_relacionado'                => 'VARCHAR(20) NULL',
+        'serie_documento'                           => 'VARCHAR(50) NULL',
+        'numero_documento'                          => 'VARCHAR(50) NULL',
+        'monto_sujeto_retencion'                    => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'retencion_iva_1'                           => 'DECIMAL(10,2) NOT NULL DEFAULT 0.00',
+        'dui_agente_retencion'                      => 'VARCHAR(20) NULL',
+        'numero_anexo'                              => 'VARCHAR(20) NULL',
     ];
 
     public static function getByLibro(PDO $pdo, int $idLibro): array {
@@ -72,8 +72,7 @@ class FacturaModel {
                 iva_retenido,
                 numero_control_completo,
                 raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id"
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             (int) $data['id_libro'],
@@ -98,7 +97,7 @@ class FacturaModel {
             $data['raw_json'] ?? null,
         ]);
 
-        return (int) $stmt->fetchColumn();
+        return (int) $pdo->lastInsertId();
     }
 
     public static function ensureExtendedSchema(PDO $pdo): void {
@@ -193,31 +192,22 @@ class FacturaModel {
         self::$schemaChecked = true;
 
         try {
-            $stmt = $pdo->query(
-                "SELECT column_name, data_type
-                 FROM information_schema.columns
-                 WHERE table_schema = current_schema()
-                   AND table_name = 'facturas'"
-            );
+            $stmt = $pdo->query("SHOW COLUMNS FROM facturas");
             $columnas = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
             $existentes = [];
 
             foreach ($columnas as $columna) {
-                $nombre = strtolower((string) ($columna['column_name'] ?? ''));
+                $nombre = strtolower((string) ($columna['Field'] ?? ''));
                 if ($nombre === '') {
                     continue;
                 }
 
-                $existentes[$nombre] = strtolower((string) ($columna['data_type'] ?? ''));
+                $existentes[$nombre] = strtolower((string) ($columna['Type'] ?? ''));
             }
 
             $tipoSello = $existentes['sello_recepcion'] ?? '';
-            if ($tipoSello !== '' && $tipoSello !== 'text') {
-                $pdo->exec(
-                    "ALTER TABLE facturas
-                     ALTER COLUMN sello_recepcion TYPE TEXT
-                     USING sello_recepcion::text"
-                );
+            if ($tipoSello !== '' && str_contains($tipoSello, 'varchar(50)')) {
+                $pdo->exec("ALTER TABLE facturas MODIFY sello_recepcion TEXT NULL");
             }
 
             foreach (self::EXTRA_COLUMNS as $columna => $definicion) {

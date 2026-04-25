@@ -6,7 +6,6 @@ class LibroModel {
         $stmt = $pdo->prepare(
             "SELECT
                 l.*,
-                CASE WHEN l.estado THEN 1 ELSE 0 END AS estado,
                 e.nombre AS empresa_nombre,
                 e.iniciales AS empresa_iniciales,
                 e.color_emblema AS empresa_color,
@@ -14,7 +13,7 @@ class LibroModel {
                 e.nrc AS empresa_nrc
              FROM libros l
              INNER JOIN empresas e ON e.id = l.id_empresa
-             WHERE l.id_usuario = ? AND l.estado = TRUE AND e.estado = TRUE
+             WHERE l.id_usuario = ? AND l.estado = 1 AND e.estado = 1
              ORDER BY l.anio DESC, l.mes DESC, l.id DESC"
         );
         $stmt->execute([$idUsuario]);
@@ -26,7 +25,6 @@ class LibroModel {
         $stmt = $pdo->prepare(
             "SELECT
                 l.*,
-                CASE WHEN l.estado THEN 1 ELSE 0 END AS estado,
                 e.nombre AS empresa_nombre,
                 e.iniciales AS empresa_iniciales,
                 e.color_emblema AS empresa_color,
@@ -34,7 +32,7 @@ class LibroModel {
                 e.nrc AS empresa_nrc
              FROM libros l
              INNER JOIN empresas e ON e.id = l.id_empresa
-             WHERE l.id_usuario = ? AND l.tipo = ? AND l.estado = TRUE AND e.estado = TRUE
+             WHERE l.id_usuario = ? AND l.tipo = ? AND l.estado = 1 AND e.estado = 1
              ORDER BY l.anio DESC, l.mes DESC, l.id DESC"
         );
         $stmt->execute([$idUsuario, $tipo]);
@@ -45,10 +43,9 @@ class LibroModel {
     public static function getByEmpresa(PDO $pdo, int $idEmpresa, ?string $tipo = null): array {
         if ($tipo === null) {
             $stmt = $pdo->prepare(
-                "SELECT *,
-                        CASE WHEN estado THEN 1 ELSE 0 END AS estado
+                "SELECT *
                  FROM libros
-                 WHERE id_empresa = ? AND estado = TRUE
+                 WHERE id_empresa = ? AND estado = 1
                  ORDER BY anio DESC, mes DESC, id DESC"
             );
             $stmt->execute([$idEmpresa]);
@@ -60,10 +57,9 @@ class LibroModel {
 
     public static function getByEmpresaYTipo(PDO $pdo, int $idEmpresa, string $tipo): array {
         $stmt = $pdo->prepare(
-            "SELECT *,
-                    CASE WHEN estado THEN 1 ELSE 0 END AS estado
+            "SELECT *
              FROM libros
-             WHERE id_empresa = ? AND tipo = ? AND estado = TRUE
+             WHERE id_empresa = ? AND tipo = ? AND estado = 1
              ORDER BY anio DESC, mes DESC, id DESC"
         );
         $stmt->execute([$idEmpresa, $tipo]);
@@ -75,7 +71,6 @@ class LibroModel {
         $stmt = $pdo->prepare(
             "SELECT
                 l.*,
-                CASE WHEN l.estado THEN 1 ELSE 0 END AS estado,
                 e.nombre AS empresa_nombre,
                 e.iniciales AS empresa_iniciales,
                 e.color_emblema AS empresa_color,
@@ -85,7 +80,7 @@ class LibroModel {
                 e.tipo_legal AS empresa_tipo_legal
              FROM libros l
              INNER JOIN empresas e ON e.id = l.id_empresa
-             WHERE l.id = ? AND l.id_usuario = ? AND l.estado = TRUE AND e.estado = TRUE"
+             WHERE l.id = ? AND l.id_usuario = ? AND l.estado = 1 AND e.estado = 1"
         );
         $stmt->execute([$idLibro, $idUsuario]);
 
@@ -96,8 +91,7 @@ class LibroModel {
     public static function create(PDO $pdo, array $data): int {
         $stmt = $pdo->prepare(
             "INSERT INTO libros (id_empresa, id_usuario, tipo, mes, anio)
-             VALUES (?, ?, ?, ?, ?)
-             RETURNING id"
+             VALUES (?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             (int) $data['id_empresa'],
@@ -107,15 +101,14 @@ class LibroModel {
             (int) $data['anio'],
         ]);
 
-        return (int) $stmt->fetchColumn();
+        return (int) $pdo->lastInsertId();
     }
 
     public static function findByEmpresaTipoPeriodo(PDO $pdo, int $idEmpresa, string $tipo, int $mes, int $anio): ?array {
         $stmt = $pdo->prepare(
-            "SELECT *,
-                    CASE WHEN estado THEN 1 ELSE 0 END AS estado
+            "SELECT *
              FROM libros
-             WHERE id_empresa = ? AND tipo = ? AND mes = ? AND anio = ? AND estado = TRUE
+             WHERE id_empresa = ? AND tipo = ? AND mes = ? AND anio = ? AND estado = 1
              LIMIT 1"
         );
         $stmt->execute([$idEmpresa, $tipo, $mes, $anio]);

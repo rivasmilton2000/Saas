@@ -58,17 +58,3 @@ if (!function_exists('dbDriverName')) {
         return $stmt->fetchColumn() !== false;
     }
 }
-
-if (!function_exists('dbConfig')) {
-    function dbConfig(): array {
-        global $host, $port, $dbname, $user, $pass;
-
-        return [
-            'host'   => (string) $host,
-            'port'   => (string) $port,
-            'dbname' => (string) $dbname,
-            'user'   => (string) $user,
-            'pass'   => (string) $pass,
-        ];
-    }
-}

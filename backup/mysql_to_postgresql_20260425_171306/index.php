@@ -7,7 +7,6 @@ require_once __DIR__ . '/models/EmpresaModel.php';
 require_once __DIR__ . '/models/UsuarioModel.php';
 require_once __DIR__ . '/services/BitacoraService.php';
 require_once __DIR__ . '/services/CentroMandoService.php';
-require_once __DIR__ . '/services/DatabaseBackupService.php';
 
 requireLogin();
 
@@ -484,35 +483,6 @@ $roleLabels = [
     'admin' => 'Administrador',
     'user'  => 'Usuario',
 ];
-$backupDashboard = [
-    'overview' => null,
-    'auto_result' => null,
-    'error' => null,
-];
-
-if ($esAdmin) {
-    try {
-        $backupDashboard['auto_result'] = DatabaseBackupService::ensureDailyBackup(dbConfig());
-        if (($backupDashboard['auto_result']['created'] ?? false) === true) {
-            $backupCreado = $backupDashboard['auto_result']['backup'] ?? [];
-            $registrarBitacora(
-                'backups',
-                'generar_backup_diario',
-                'Genero el backup diario de PostgreSQL desde el dashboard.',
-                [
-                    'contexto' => [
-                        'detalle' => (string) ($backupCreado['name'] ?? 'backup_diario.sql'),
-                        'formato' => 'sql',
-                    ],
-                ]
-            );
-        }
-
-        $backupDashboard['overview'] = DatabaseBackupService::getOverview(dbConfig(), 8);
-    } catch (Throwable $exception) {
-        $backupDashboard['error'] = $exception->getMessage();
-    }
-}
 $basePath = '';
 $empresaActivaNavbar = $data['empresa_activa'] ?? null;
 $horaActual = (int) $ahoraLocal->format('G');
@@ -1464,101 +1434,6 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
           width: 100%;
         }
       }
-
-      .admin-backup-card {
-        border: 1px solid rgba(75, 73, 172, 0.08);
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 58%, #eef2ff 100%);
-        box-shadow: 0 20px 44px rgba(15, 23, 42, 0.06);
-      }
-
-      .admin-backup-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.95fr);
-        gap: 1.25rem;
-      }
-
-      .admin-backup-kicker {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.8rem;
-        color: #4b49ac;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-
-      .admin-backup-title {
-        margin: 0;
-        color: #111827;
-        font-size: 1.4rem;
-        font-weight: 700;
-      }
-
-      .admin-backup-copy {
-        margin: 0.75rem 0 0;
-        max-width: 42rem;
-        color: #64748b;
-        font-size: 0.95rem;
-      }
-
-      .admin-backup-stats {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.85rem;
-      }
-
-      .admin-backup-stat {
-        padding: 1rem 1.05rem;
-        border-radius: 18px;
-        border: 1px solid rgba(75, 73, 172, 0.1);
-        background: rgba(255, 255, 255, 0.92);
-      }
-
-      .admin-backup-stat span {
-        display: block;
-        margin-bottom: 0.25rem;
-        color: #7c8699;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .admin-backup-stat strong {
-        display: block;
-        color: #111827;
-        font-size: 1.15rem;
-        font-weight: 700;
-      }
-
-      .admin-backup-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.45rem 0.85rem;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-      }
-
-      .admin-backup-status--ok {
-        background: rgba(34, 197, 94, 0.12);
-        color: #166534;
-      }
-
-      .admin-backup-status--warn {
-        background: rgba(249, 115, 22, 0.14);
-        color: #9a3412;
-      }
-
-      @media (max-width: 1199.98px) {
-        .admin-backup-grid,
-        .admin-backup-stats {
-          grid-template-columns: 1fr;
-        }
-      }
     </style>
   </head>
   <body>
@@ -1709,63 +1584,6 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
             <?php endif; ?>
 
             <?php if ($esAdmin): ?>
-            <?php $backupOverview = is_array($backupDashboard['overview'] ?? null) ? $backupDashboard['overview'] : []; ?>
-            <?php $backupToday = $backupOverview['today_backup'] ?? null; ?>
-            <?php $backupLatest = $backupOverview['latest_backup'] ?? null; ?>
-            <div class="row mb-4">
-              <div class="col-12">
-                <div class="card admin-backup-card">
-                  <div class="card-body">
-                    <div class="admin-backup-grid">
-                      <div>
-                        <span class="admin-backup-kicker"><i class="mdi mdi-database-lock-outline"></i> Respaldo diario admin</span>
-                        <h4 class="admin-backup-title">El panel admin ya controla el backup diario</h4>
-                        <p class="admin-backup-copy">
-                          Cada vez que entra un administrador, el sistema valida si ya existe el respaldo de hoy para la base PostgreSQL y lo genera solo una vez por dia.
-                        </p>
-                        <div class="d-flex flex-wrap gap-2 mt-3">
-                          <span class="admin-backup-status <?php echo $backupToday ? 'admin-backup-status--ok' : 'admin-backup-status--warn'; ?>">
-                            <i class="mdi <?php echo $backupToday ? 'mdi-check-decagram-outline' : 'mdi-alert-outline'; ?>"></i>
-                            <?php echo $backupToday ? 'Backup del dia listo' : 'Pendiente de generar'; ?>
-                          </span>
-                          <?php if ($backupDashboard['error']): ?>
-                          <span class="admin-backup-status admin-backup-status--warn">
-                            <i class="mdi mdi-alert-circle-outline"></i>
-                            Revisar modulo de backups
-                          </span>
-                          <?php endif; ?>
-                        </div>
-                        <?php if ($backupDashboard['error']): ?>
-                        <div class="alert alert-warning mt-3 mb-0">
-                          <?php echo htmlspecialchars((string) $backupDashboard['error']); ?>
-                        </div>
-                        <?php endif; ?>
-                        <div class="d-flex flex-wrap gap-2 mt-3">
-                          <a href="pages/backups.php" class="btn btn-primary">Abrir modulo</a>
-                          <?php if ($backupLatest): ?>
-                          <a href="pages/backups.php?download=<?php echo rawurlencode((string) ($backupLatest['name'] ?? '')); ?>" class="btn btn-outline-secondary">Descargar ultimo</a>
-                          <?php endif; ?>
-                        </div>
-                      </div>
-                      <div class="admin-backup-stats">
-                        <div class="admin-backup-stat">
-                          <span>Total backups</span>
-                          <strong><?php echo (int) ($backupOverview['total_backups'] ?? 0); ?></strong>
-                        </div>
-                        <div class="admin-backup-stat">
-                          <span>Ultimo generado</span>
-                          <strong><?php echo htmlspecialchars((string) ($backupLatest['created_at_label'] ?? '-')); ?></strong>
-                        </div>
-                        <div class="admin-backup-stat">
-                          <span>Tamano ultimo</span>
-                          <strong><?php echo htmlspecialchars((string) ($backupLatest['size_label'] ?? '-')); ?></strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
             <div class="row">
               <div class="col-lg-4 grid-margin stretch-card">
                 <div class="card">

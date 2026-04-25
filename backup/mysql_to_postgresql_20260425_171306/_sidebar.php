@@ -7,10 +7,8 @@ $modulos  = array_filter(
     static fn(array $modulo): bool => ($modulo['visible_sidebar'] ?? false) === true
 );
 $currentPath = str_replace('\\', '/', (string) ($_SERVER['PHP_SELF'] ?? ''));
-$currentPage = basename($currentPath);
-$isDashboard = $currentPage === 'index.php';
-$isBitacora  = $currentPage === 'bitacora.php';
-$isBackups   = $currentPage === 'backups.php';
+$isDashboard = substr($currentPath, -10) === '/index.php';
+$isBitacora  = substr($currentPath, -13) === '/bitacora.php';
 ?>
 <nav class="sidebar sidebar-offcanvas" id="sidebar">
   <ul class="nav">
@@ -38,14 +36,6 @@ $isBackups   = $currentPage === 'backups.php';
         <span class="menu-title">Bitacora</span>
       </a>
     </li>
-    <?php if (function_exists('isAdmin') && isAdmin()): ?>
-    <li class="nav-item">
-      <a class="nav-link <?php echo $isBackups ? 'active' : ''; ?>" href="<?php echo $basePath; ?>pages/backups.php">
-        <i class="mdi mdi-database-lock-outline menu-icon"></i>
-        <span class="menu-title">Backups</span>
-      </a>
-    </li>
-    <?php endif; ?>
     <li class="nav-item">
       <a class="nav-link" href="<?php echo $basePath; ?>pages/samples/logout.php">
         <i class="icon-power menu-icon"></i>

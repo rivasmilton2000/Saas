@@ -8,21 +8,9 @@ class EmpresaModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->prepare(
-            "SELECT
-                id,
-                id_usuario,
-                nombre,
-                iniciales,
-                color_emblema,
-                dui,
-                nit,
-                nrc,
-                tipo_legal,
-                CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                created_at,
-                ultima_vez_usada
+            "SELECT *
              FROM empresas
-             WHERE id_usuario = ? AND estado = TRUE
+             WHERE id_usuario = ? AND estado = 1
              ORDER BY nombre ASC, id DESC"
         );
         $stmt->execute([$idUsuario]);
@@ -34,21 +22,9 @@ class EmpresaModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->prepare(
-            "SELECT
-                id,
-                id_usuario,
-                nombre,
-                iniciales,
-                color_emblema,
-                dui,
-                nit,
-                nrc,
-                tipo_legal,
-                CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                created_at,
-                ultima_vez_usada
+            "SELECT *
              FROM empresas
-             WHERE id = ? AND id_usuario = ? AND estado = TRUE"
+             WHERE id = ? AND id_usuario = ? AND estado = 1"
         );
         $stmt->execute([$idEmpresa, $idUsuario]);
 
@@ -57,15 +33,13 @@ class EmpresaModel {
     }
 
     public static function create(PDO $pdo, array $data): int {
-        self::ensureSchema($pdo);
-
-        $nombre    = trim((string) ($data['nombre'] ?? ''));
-        $iniciales = self::normalizarIniciales($nombre, $data['iniciales'] ?? '');
-        $color     = trim((string) ($data['color_emblema'] ?? '#f97316'));
-        $dui       = self::normalizeDui($data['dui'] ?? null);
-        $nit       = self::normalizeNit($data['nit'] ?? null);
-        $nrc       = self::nullable($data['nrc'] ?? null);
-        $tipoLegal = trim((string) ($data['tipo_legal'] ?? 'natural'));
+        $nombre     = trim((string) ($data['nombre'] ?? ''));
+        $iniciales  = self::normalizarIniciales($nombre, $data['iniciales'] ?? '');
+        $color      = trim((string) ($data['color_emblema'] ?? '#f97316'));
+        $dui        = self::normalizeDui($data['dui'] ?? null);
+        $nit        = self::normalizeNit($data['nit'] ?? null);
+        $nrc        = self::nullable($data['nrc'] ?? null);
+        $tipoLegal  = trim((string) ($data['tipo_legal'] ?? 'natural'));
 
         $stmt = $pdo->prepare(
             "INSERT INTO empresas (
@@ -77,8 +51,7 @@ class EmpresaModel {
                 nit,
                 nrc,
                 tipo_legal
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id"
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             (int) $data['id_usuario'],
@@ -91,16 +64,15 @@ class EmpresaModel {
             $tipoLegal,
         ]);
 
-        return (int) $stmt->fetchColumn();
+        return (int) $pdo->lastInsertId();
     }
 
     public static function marcarUltimaUsada(PDO $pdo, int $idEmpresa, int $idUsuario): void {
         self::ensureSchema($pdo);
-
         try {
             $stmt = $pdo->prepare(
                 "UPDATE empresas
-                 SET ultima_vez_usada = CURRENT_TIMESTAMP
+                 SET ultima_vez_usada = NOW()
                  WHERE id = ? AND id_usuario = ?"
             );
             $stmt->execute([$idEmpresa, $idUsuario]);
@@ -111,24 +83,11 @@ class EmpresaModel {
 
     public static function getUltimaUsada(PDO $pdo, int $idUsuario): ?array {
         self::ensureSchema($pdo);
-
         try {
             $stmt = $pdo->prepare(
-                "SELECT
-                    id,
-                    id_usuario,
-                    nombre,
-                    iniciales,
-                    color_emblema,
-                    dui,
-                    nit,
-                    nrc,
-                    tipo_legal,
-                    CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                    created_at,
-                    ultima_vez_usada
+                "SELECT *
                  FROM empresas
-                 WHERE id_usuario = ? AND estado = TRUE
+                 WHERE id_usuario = ? AND estado = 1
                  ORDER BY
                     CASE WHEN ultima_vez_usada IS NULL THEN 1 ELSE 0 END,
                     ultima_vez_usada DESC,
@@ -145,11 +104,9 @@ class EmpresaModel {
     }
 
     public static function delete(PDO $pdo, int $idEmpresa, int $idUsuario): bool {
-        self::ensureSchema($pdo);
-
         $stmt = $pdo->prepare(
             "UPDATE empresas
-             SET estado = FALSE
+             SET estado = 0
              WHERE id = ? AND id_usuario = ?"
         );
         $stmt->execute([$idEmpresa, $idUsuario]);
@@ -158,12 +115,10 @@ class EmpresaModel {
     }
 
     public static function existeNrc(PDO $pdo, int $idUsuario, string $nrc): bool {
-        self::ensureSchema($pdo);
-
         $stmt = $pdo->prepare(
             "SELECT id
              FROM empresas
-             WHERE id_usuario = ? AND nrc = ? AND estado = TRUE"
+             WHERE id_usuario = ? AND nrc = ? AND estado = 1"
         );
         $stmt->execute([$idUsuario, trim($nrc)]);
 
@@ -171,8 +126,6 @@ class EmpresaModel {
     }
 
     public static function existeNit(PDO $pdo, int $idUsuario, string $nit): bool {
-        self::ensureSchema($pdo);
-
         $nit = self::normalizeNit($nit);
         if ($nit === null) {
             return false;
@@ -181,7 +134,7 @@ class EmpresaModel {
         $stmt = $pdo->prepare(
             "SELECT id
              FROM empresas
-             WHERE id_usuario = ? AND nit = ? AND estado = TRUE"
+             WHERE id_usuario = ? AND nit = ? AND estado = 1"
         );
         $stmt->execute([$idUsuario, $nit]);
 
@@ -276,7 +229,10 @@ class EmpresaModel {
         self::$schemaChecked = true;
 
         try {
-            if (!dbColumnExists($pdo, 'empresas', 'ultima_vez_usada')) {
+            $stmt = $pdo->query("SHOW COLUMNS FROM empresas LIKE 'ultima_vez_usada'");
+            $columna = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+
+            if (!$columna) {
                 $pdo->exec("ALTER TABLE empresas ADD COLUMN ultima_vez_usada TIMESTAMP NULL");
             }
         } catch (Throwable $exception) {

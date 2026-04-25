@@ -12,8 +12,8 @@ class UsuarioModel {
 
         $pdo->exec(
             "ALTER TABLE usuarios
-                ADD COLUMN IF NOT EXISTS nombre_completo VARCHAR(150) NULL,
-                ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(255) NULL"
+                ADD COLUMN IF NOT EXISTS nombre_completo VARCHAR(150) NULL AFTER username,
+                ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(255) NULL AFTER nombre_completo"
         );
 
         self::$schemaChecked = true;
@@ -22,19 +22,12 @@ class UsuarioModel {
     public static function getById(PDO $pdo, int $idUsuario, bool $onlyActive = true): ?array {
         self::ensureSchema($pdo);
 
-        $sql = "SELECT id,
-                       username,
-                       nombre_completo,
-                       foto_perfil,
-                       password,
-                       rol,
-                       CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                       created_at
+        $sql = "SELECT id, username, nombre_completo, foto_perfil, password, rol, estado, created_at
                 FROM usuarios
                 WHERE id = ?";
 
         if ($onlyActive) {
-            $sql .= " AND estado = TRUE";
+            $sql .= " AND estado = 1";
         }
 
         $sql .= " LIMIT 1";
@@ -50,14 +43,7 @@ class UsuarioModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->prepare(
-            "SELECT id,
-                    username,
-                    nombre_completo,
-                    foto_perfil,
-                    password,
-                    rol,
-                    CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                    created_at
+            "SELECT id, username, nombre_completo, foto_perfil, password, rol, estado, created_at
              FROM usuarios
              WHERE LOWER(username) = LOWER(?)
              LIMIT 1"
@@ -72,16 +58,10 @@ class UsuarioModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->query(
-            "SELECT id,
-                    username,
-                    nombre_completo,
-                    foto_perfil,
-                    rol,
-                    CASE WHEN estado THEN 1 ELSE 0 END AS estado,
-                    created_at
+            "SELECT id, username, nombre_completo, foto_perfil, rol, estado, created_at
              FROM usuarios
-             WHERE estado = TRUE
-             ORDER BY CASE rol WHEN 'admin' THEN 0 ELSE 1 END, username ASC"
+             WHERE estado = 1
+             ORDER BY FIELD(rol, 'admin', 'user'), username ASC"
         );
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -96,7 +76,7 @@ class UsuarioModel {
                 SUM(CASE WHEN rol = 'admin' THEN 1 ELSE 0 END) AS admins,
                 SUM(CASE WHEN rol = 'user' THEN 1 ELSE 0 END) AS users
              FROM usuarios
-             WHERE estado = TRUE"
+             WHERE estado = 1"
         );
 
         $resumen = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -113,7 +93,7 @@ class UsuarioModel {
 
         $sql = "SELECT COUNT(*)
                 FROM usuarios
-                WHERE rol = 'admin' AND estado = TRUE";
+                WHERE rol = 'admin' AND estado = 1";
         $params = [];
 
         if ($excludeId !== null && $excludeId > 0) {
@@ -174,7 +154,7 @@ class UsuarioModel {
                 'username' => $username,
                 'password' => password_hash($password, PASSWORD_DEFAULT),
                 'rol'      => $rolFinal,
-                'estado'   => true,
+                'estado'   => 1,
             ],
             'old'  => $oldInput,
         ];
@@ -260,8 +240,7 @@ class UsuarioModel {
 
         $stmt = $pdo->prepare(
             "INSERT INTO usuarios (username, nombre_completo, foto_perfil, password, rol, estado)
-             VALUES (?, ?, ?, ?, ?, ?)
-             RETURNING id"
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             trim((string) $data['username']),
@@ -269,10 +248,10 @@ class UsuarioModel {
             self::nullableText($data['foto_perfil'] ?? null),
             (string) $data['password'],
             self::normalizeRole($data['rol'] ?? 'user'),
-            dbBoolValue($data['estado'] ?? true),
+            isset($data['estado']) ? (int) $data['estado'] : 1,
         ]);
 
-        return (int) $stmt->fetchColumn();
+        return (int) $pdo->lastInsertId();
     }
 
     public static function update(PDO $pdo, int $idUsuario, array $data): bool {
@@ -302,7 +281,7 @@ class UsuarioModel {
         $stmt = $pdo->prepare(
             "UPDATE usuarios
              SET " . implode(', ', $fields) . "
-             WHERE id = ? AND estado = TRUE"
+             WHERE id = ? AND estado = 1"
         );
 
         return $stmt->execute($params);
@@ -313,8 +292,8 @@ class UsuarioModel {
 
         $stmt = $pdo->prepare(
             "UPDATE usuarios
-             SET estado = FALSE
-             WHERE id = ? AND estado = TRUE"
+             SET estado = 0
+             WHERE id = ? AND estado = 1"
         );
         $stmt->execute([$idUsuario]);
 
@@ -358,7 +337,7 @@ class UsuarioModel {
         $stmt = $pdo->prepare(
             "UPDATE usuarios
              SET " . implode(', ', $fields) . "
-             WHERE id = ? AND estado = TRUE"
+             WHERE id = ? AND estado = 1"
         );
 
         return $stmt->execute($params);
@@ -369,7 +348,7 @@ class UsuarioModel {
 
         $sql = "SELECT id
                 FROM usuarios
-                WHERE LOWER(username) = LOWER(?) AND estado = TRUE";
+                WHERE LOWER(username) = LOWER(?) AND estado = 1";
         $params = [trim($username)];
 
         if ($excludeId !== null && $excludeId > 0) {

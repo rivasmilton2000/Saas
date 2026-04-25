@@ -25,7 +25,7 @@ class AuthController {
             self::redirect('Usuario no encontrado.');
         }
 
-        if (dbBoolInt($usuario['estado'] ?? false) !== 1) {
+        if (!(bool) $usuario['estado']) {
             self::redirect('Usuario inactivo. Contacta al administrador.');
         }
 

@@ -70,9 +70,7 @@ class CentroMandoModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->prepare(
-            "SELECT id_empresa,
-                    item_key,
-                    CASE WHEN completado THEN 1 ELSE 0 END AS completado
+            "SELECT id_empresa, item_key, completado
              FROM centro_mando_avance
              WHERE id_usuario = ? AND mes = ? AND anio = ?"
         );
@@ -80,9 +78,9 @@ class CentroMandoModel {
 
         $map = [];
         foreach ($stmt->fetchAll() as $row) {
-            $empresaId  = (int) ($row['id_empresa'] ?? 0);
-            $itemKey    = (string) ($row['item_key'] ?? '');
-            $completado = (int) ($row['completado'] ?? 0) === 1;
+            $empresaId   = (int) ($row['id_empresa'] ?? 0);
+            $itemKey     = (string) ($row['item_key'] ?? '');
+            $completado  = (int) ($row['completado'] ?? 0) === 1;
 
             if ($empresaId <= 0 || $itemKey === '') {
                 continue;
@@ -119,10 +117,9 @@ class CentroMandoModel {
                 completado,
                 completed_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (id_empresa, mes, anio, item_key) DO UPDATE SET
-                id_usuario = EXCLUDED.id_usuario,
-                completado = EXCLUDED.completado,
-                completed_at = EXCLUDED.completed_at,
+            ON DUPLICATE KEY UPDATE
+                completado = VALUES(completado),
+                completed_at = VALUES(completed_at),
                 updated_at = CURRENT_TIMESTAMP"
         );
         $stmt->execute([
@@ -131,7 +128,7 @@ class CentroMandoModel {
             $mes,
             $anio,
             $itemKey,
-            $completado,
+            $completado ? 1 : 0,
             $completado ? date('Y-m-d H:i:s') : null,
         ]);
     }
@@ -187,9 +184,8 @@ class CentroMandoModel {
                 anio,
                 nota
             ) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (id_empresa, mes, anio) DO UPDATE SET
-                id_usuario = EXCLUDED.id_usuario,
-                nota = EXCLUDED.nota,
+            ON DUPLICATE KEY UPDATE
+                nota = VALUES(nota),
                 updated_at = CURRENT_TIMESTAMP"
         );
         $stmt->execute([$idEmpresa, $idUsuario, $mes, $anio, $nota]);
@@ -199,7 +195,7 @@ class CentroMandoModel {
         self::ensureSchema($pdo);
 
         $stmt = $pdo->prepare(
-            "SELECT CASE WHEN ocultar_bienvenida THEN 1 ELSE 0 END AS ocultar_bienvenida
+            "SELECT ocultar_bienvenida
              FROM centro_mando_preferencias
              WHERE id_usuario = ?
              LIMIT 1"
@@ -216,11 +212,11 @@ class CentroMandoModel {
         $stmt = $pdo->prepare(
             "INSERT INTO centro_mando_preferencias (id_usuario, ocultar_bienvenida)
              VALUES (?, ?)
-             ON CONFLICT (id_usuario) DO UPDATE SET
-                ocultar_bienvenida = EXCLUDED.ocultar_bienvenida,
+             ON DUPLICATE KEY UPDATE
+                ocultar_bienvenida = VALUES(ocultar_bienvenida),
                 updated_at = CURRENT_TIMESTAMP"
         );
-        $stmt->execute([$idUsuario, $ocultar]);
+        $stmt->execute([$idUsuario, $ocultar ? 1 : 0]);
     }
 
     private static function ensureSchema(PDO $pdo): void {
@@ -232,98 +228,67 @@ class CentroMandoModel {
 
         try {
             $pdo->exec(
-                "CREATE OR REPLACE FUNCTION set_updated_at()
-                 RETURNS trigger AS $$
-                 BEGIN
-                     NEW.updated_at = CURRENT_TIMESTAMP;
-                     RETURN NEW;
-                 END;
-                 $$ LANGUAGE plpgsql"
-            );
-
-            $pdo->exec(
                 "CREATE TABLE IF NOT EXISTS centro_mando_config (
-                    id SERIAL PRIMARY KEY,
-                    id_empresa INTEGER NOT NULL,
-                    id_usuario INTEGER NOT NULL,
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    id_empresa INT NOT NULL,
+                    id_usuario INT NOT NULL,
                     item_key VARCHAR(80) NOT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_empresa_item UNIQUE (id_empresa, item_key),
+                    UNIQUE KEY unique_empresa_item (id_empresa, item_key),
+                    KEY idx_centro_mando_config_usuario (id_usuario),
                     CONSTRAINT fk_centro_mando_config_empresa
-                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
                     CONSTRAINT fk_centro_mando_config_usuario
-                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
                 )"
             );
-            $pdo->exec("CREATE INDEX IF NOT EXISTS idx_centro_mando_config_usuario ON centro_mando_config (id_usuario)");
 
             $pdo->exec(
                 "CREATE TABLE IF NOT EXISTS centro_mando_avance (
-                    id SERIAL PRIMARY KEY,
-                    id_empresa INTEGER NOT NULL,
-                    id_usuario INTEGER NOT NULL,
-                    mes SMALLINT NOT NULL CHECK (mes BETWEEN 1 AND 12),
-                    anio INTEGER NOT NULL CHECK (anio BETWEEN 2000 AND 9999),
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    id_empresa INT NOT NULL,
+                    id_usuario INT NOT NULL,
+                    mes TINYINT NOT NULL,
+                    anio YEAR NOT NULL,
                     item_key VARCHAR(80) NOT NULL,
-                    completado BOOLEAN NOT NULL DEFAULT FALSE,
-                    completed_at TIMESTAMP NULL,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_empresa_periodo_item UNIQUE (id_empresa, mes, anio, item_key),
+                    completado TINYINT(1) NOT NULL DEFAULT 0,
+                    completed_at DATETIME NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_empresa_periodo_item (id_empresa, mes, anio, item_key),
+                    KEY idx_centro_mando_avance_usuario (id_usuario),
                     CONSTRAINT fk_centro_mando_avance_empresa
-                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
                     CONSTRAINT fk_centro_mando_avance_usuario
-                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
                 )"
-            );
-            $pdo->exec("CREATE INDEX IF NOT EXISTS idx_centro_mando_avance_usuario ON centro_mando_avance (id_usuario)");
-            $pdo->exec("DROP TRIGGER IF EXISTS trg_centro_mando_avance_updated_at ON centro_mando_avance");
-            $pdo->exec(
-                "CREATE TRIGGER trg_centro_mando_avance_updated_at
-                 BEFORE UPDATE ON centro_mando_avance
-                 FOR EACH ROW
-                 EXECUTE FUNCTION set_updated_at()"
             );
 
             $pdo->exec(
                 "CREATE TABLE IF NOT EXISTS centro_mando_notas (
-                    id SERIAL PRIMARY KEY,
-                    id_empresa INTEGER NOT NULL,
-                    id_usuario INTEGER NOT NULL,
-                    mes SMALLINT NOT NULL CHECK (mes BETWEEN 1 AND 12),
-                    anio INTEGER NOT NULL CHECK (anio BETWEEN 2000 AND 9999),
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    id_empresa INT NOT NULL,
+                    id_usuario INT NOT NULL,
+                    mes TINYINT NOT NULL,
+                    anio YEAR NOT NULL,
                     nota TEXT NULL,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT unique_empresa_periodo_nota UNIQUE (id_empresa, mes, anio),
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_empresa_periodo_nota (id_empresa, mes, anio),
+                    KEY idx_centro_mando_notas_usuario (id_usuario),
                     CONSTRAINT fk_centro_mando_notas_empresa
-                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        FOREIGN KEY (id_empresa) REFERENCES empresas(id) ON DELETE CASCADE,
                     CONSTRAINT fk_centro_mando_notas_usuario
-                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
                 )"
-            );
-            $pdo->exec("CREATE INDEX IF NOT EXISTS idx_centro_mando_notas_usuario ON centro_mando_notas (id_usuario)");
-            $pdo->exec("DROP TRIGGER IF EXISTS trg_centro_mando_notas_updated_at ON centro_mando_notas");
-            $pdo->exec(
-                "CREATE TRIGGER trg_centro_mando_notas_updated_at
-                 BEFORE UPDATE ON centro_mando_notas
-                 FOR EACH ROW
-                 EXECUTE FUNCTION set_updated_at()"
             );
 
             $pdo->exec(
                 "CREATE TABLE IF NOT EXISTS centro_mando_preferencias (
-                    id_usuario INTEGER PRIMARY KEY,
-                    ocultar_bienvenida BOOLEAN NOT NULL DEFAULT FALSE,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    id_usuario INT PRIMARY KEY,
+                    ocultar_bienvenida TINYINT(1) NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     CONSTRAINT fk_centro_mando_preferencias_usuario
-                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+                        FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE
                 )"
-            );
-            $pdo->exec("DROP TRIGGER IF EXISTS trg_centro_mando_preferencias_updated_at ON centro_mando_preferencias");
-            $pdo->exec(
-                "CREATE TRIGGER trg_centro_mando_preferencias_updated_at
-                 BEFORE UPDATE ON centro_mando_preferencias
-                 FOR EACH ROW
-                 EXECUTE FUNCTION set_updated_at()"
             );
         } catch (Throwable $exception) {
             // No bloqueamos la app si la migracion automatica falla.

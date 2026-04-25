@@ -11,26 +11,24 @@ class BitacoraModel {
 
         $pdo->exec(
             "CREATE TABLE IF NOT EXISTS bitacora_movimientos (
-                id SERIAL PRIMARY KEY,
-                id_usuario INTEGER NOT NULL,
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_usuario INT NOT NULL,
                 username_snapshot VARCHAR(100) NOT NULL,
                 rol_snapshot VARCHAR(20) DEFAULT NULL,
                 modulo VARCHAR(80) NOT NULL,
                 accion VARCHAR(120) NOT NULL,
                 descripcion VARCHAR(255) NOT NULL,
                 entidad_tipo VARCHAR(80) DEFAULT NULL,
-                entidad_id INTEGER DEFAULT NULL,
-                contexto_json TEXT DEFAULT NULL,
+                entidad_id INT DEFAULT NULL,
+                contexto_json LONGTEXT DEFAULT NULL,
                 ip_address VARCHAR(45) DEFAULT NULL,
                 user_agent VARCHAR(255) DEFAULT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                CONSTRAINT fk_bitacora_usuario
-                    FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
-            )"
+                INDEX idx_bitacora_usuario (id_usuario),
+                INDEX idx_bitacora_fecha (created_at),
+                INDEX idx_bitacora_modulo (modulo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
-        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bitacora_usuario ON bitacora_movimientos (id_usuario)");
-        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bitacora_fecha ON bitacora_movimientos (created_at)");
-        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bitacora_modulo ON bitacora_movimientos (modulo)");
 
         self::$schemaReady = true;
     }
@@ -51,8 +49,7 @@ class BitacoraModel {
                 contexto_json,
                 ip_address,
                 user_agent
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id"
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
 
         $stmt->execute([
@@ -69,7 +66,7 @@ class BitacoraModel {
             self::nullableString($data['user_agent'] ?? null),
         ]);
 
-        return (int) $stmt->fetchColumn();
+        return (int) $pdo->lastInsertId();
     }
 
     public static function getMovimientos(PDO $pdo, ?int $idUsuario = null, int $limit = 300): array {
@@ -92,7 +89,7 @@ class BitacoraModel {
                     b.created_at,
                     u.username AS username_actual,
                     u.rol AS rol_actual,
-                    CASE WHEN COALESCE(u.estado, FALSE) THEN 1 ELSE 0 END AS usuario_estado
+                    u.estado AS usuario_estado
                 FROM bitacora_movimientos b
                 LEFT JOIN usuarios u ON u.id = b.id_usuario";
         $params = [];
