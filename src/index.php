@@ -62,7 +62,7 @@ if (isset($_GET['activate_company'])) {
                 'entidad_tipo' => 'empresa',
                 'entidad_id'   => (int) ($empresaActiva['id'] ?? 0),
                 'contexto'     => [
-                    'empresa' => (string) ($empresaActiva['nombre'] ?? 'Empresa'),
+                'empresa' => (string) ($empresaActiva['nombre'] ?? 'Empresa'),
                 ],
             ]
         );
