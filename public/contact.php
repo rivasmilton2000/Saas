@@ -55,7 +55,7 @@ require_once __DIR__ . '/../src/includes/contactService.php';
                 <div class="contact_info_card">
                     <i class="fa fa-envelope"></i>
                     <h4>Correo</h4>
-                    <p>contacto@zentra.com</p>
+                    <p>zentragroup1@gmail.com</p>
                 </div>
             </div>
 
@@ -63,7 +63,7 @@ require_once __DIR__ . '/../src/includes/contactService.php';
                 <div class="contact_info_card">
                     <i class="fa fa-phone"></i>
                     <h4>Teléfono</h4>
-                    <p>+503 XXXX-XXXX</p>
+                    <p>+503 7934-6671</p>
                 </div>
             </div>
 
@@ -71,7 +71,7 @@ require_once __DIR__ . '/../src/includes/contactService.php';
                 <div class="contact_info_card">
                     <i class="fa fa-clock-o"></i>
                     <h4>Horario</h4>
-                    <p>Lunes a Viernes<br>8:00 AM - 5:00 PM</p>
+                    <p>Lunes a Domingos</p>
                 </div>
             </div>
 
