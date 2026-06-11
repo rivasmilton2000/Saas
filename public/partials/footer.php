@@ -1,70 +1,116 @@
 <!-- START FOOTER -->
-		<div class="footer" style="background-image: url(assets/img/bg/footer.png);  background-size:cover;">
-			<div class="container">		
-				<div class="row footer_bg">						
-					<div class="col-lg-3 col-sm-6 col-xs-12">
-						<div class="footer_logo">
-							<img src="assets/img/Zentra_logo.png" alt="" />
-							<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce vitae risus nec dui venenatis dignissim.</p>
-						</div>
-						<div class="social_profile">
-							<ul>
-								<li><a href="#" class="f_facebook"><i class="fa fa-facebook" title="Facebook"></i></a></li>
-								<li><a href="#" class="f_twitter"><i class="fa fa-youtube" title="Twitter"></i></a></li>
-								<li><a href="#" class="f_instagram"><i class="fa fa-instagram" title="Instagram"></i></a></li>
-								<li><a href="#" class="f_linkedin"><i class="fa fa-linkedin" title="LinkedIn"></i></a></li>
-							</ul>
-						</div>							
-					</div><!--- END COL -->						
-					<div class="col-lg-3 col-sm-6 col-xs-12">
-						<div class="single_footer">
-							<h4>Frequently Asked Questions</h4>
-							<ul>
-								<li><a href="#">Privacy & Securty</a></li>
-								<li><a href="#">Terms of Service</a></li>
-								<li><a href="#">Communications</a></li>
-								<li><a href="#">Referral Terms</a></li>
-								<li><a href="#">Disclaimers</a></li>
-							</ul>
-						</div>
-					</div><!--- END COL -->	
-					<div class="col-lg-3 col-sm-6 col-xs-1">
-						<div class="single_footer">
-							<h4>Company</h4>
-							<ul>
-								<li><a href="#">Licenses</a></li>
-								<li><a href="#">market API</a></li>
-								<li><a href="#">Careers and job</a></li>
-								<li><a href="#">Emplois en France</a></li>
-								<li><a href="#">Jobs in Deutschland	</a></li>						
-							</ul>
-						</div>
-					</div><!--- END COL -->
-					<div class="col-lg-3 col-sm-6 col-xs-12">
-						<div class="newsletter-form">
-							<h4>Subscribe for get updates</h4>
-							 <form id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate">
-								<div class="input-group input-group-lg newsletter">
-									<input type="email" name="EMAIL" class="subscribe__input" placeholder="Email Address">
-									<button type="submit" class="subs_btn">Subscribe</button>
-								</div>
-								
-								<div id="mce-responses">
-									<div class="response" id="mce-error-response" style="display:none"></div>
-									<div class="response" id="mce-success-response" style="display:none"></div>
-								</div>
-							</form>
-						</div>
-					</div><!--- END COL -->		
-				</div><!--- END ROW -->		
-				<div class="row">
-					<div class="col-lg-12 text-center">
-						<div class="footer_copyright">
-							<p>&copy; 2026 Zentra. All Rights Reserved by <a href="https://bestwpware.com/" target="_blank">Bestwpware</a></p>
-              <p>Distributed by <a href="https://themewagon.com" target="_blank">ThemeWagon</a></p>
-						</div>
-					</div>
-				</div>				
-			</div><!--- END CONTAINER -->
-		</div>
-		<!-- END FOOTER -->	
+
+<div class="footer" style="background-image: url(assets/img/bg/footer.png); background-size:cover;">
+    <div class="container">
+
+```
+    <div class="row footer_bg">
+
+        <!-- LOGO Y DESCRIPCIÓN -->
+        <div class="col-lg-4 col-sm-12 col-xs-12">
+            <div class="footer_logo">
+                <img src="assets/img/Zentra_logo.png" alt="Zentra Logo" />
+
+                <p>
+                    Zentra es una plataforma empresarial diseñada para simplificar
+                    la gestión de ventas, compras, inventario, clientes y documentos
+                    tributarios electrónicos desde un solo lugar.
+                </p>
+            </div>
+
+            <div class="social_profile">
+                <ul>
+                    <li>
+                        <a href="#" class="f_facebook">
+                            <i class="fa fa-facebook"></i>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="#" class="f_twitter">
+                            <i class="fa fa-youtube"></i>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="#" class="f_instagram">
+                            <i class="fa fa-instagram"></i>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="#" class="f_linkedin">
+                            <i class="fa fa-linkedin"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <!-- END COL -->
+
+        <!-- ENLACES RÁPIDOS -->
+        <div class="col-lg-2 col-sm-6 col-xs-12">
+            <div class="single_footer">
+                <h4>Navegación</h4>
+
+                <ul>
+                    <li><a href="index.php">Inicio</a></li>
+                    <li><a href="about.php">Acerca de</a></li>
+                    <li><a href="pricing.php">Planes</a></li>
+                    <li><a href="contact.php">Contáctanos</a></li>
+                    <li><a href="../src/pages/samples/login.php">Iniciar Sesión</a></li>
+                </ul>
+            </div>
+        </div>
+        <!-- END COL -->
+
+        <!-- SOLUCIONES -->
+        <div class="col-lg-3 col-sm-6 col-xs-12">
+            <div class="single_footer">
+                <h4>Soluciones</h4>
+
+                <ul>
+                    <li><a href="#">Facturación Electrónica</a></li>
+                    <li><a href="#">Control de Inventario</a></li>
+                    <li><a href="#">Clientes y Proveedores</a></li>
+                    <li><a href="#">Reportes Inteligentes</a></li>
+                    <li><a href="#">Plataforma en la Nube</a></li>
+                </ul>
+            </div>
+        </div>
+        <!-- END COL -->
+
+        <!-- CONTACTO -->
+        <div class="col-lg-3 col-sm-12 col-xs-12">
+            <div class="single_footer">
+                <h4>Contacto</h4>
+
+                <ul>
+                    <li>📧 zentragroup1@gmail.com</li>
+                    <li>📍 El Salvador</li>
+                    <li>🕒 Lunes a Viernes</li>
+                    <li>08:00 AM - 05:00 PM</li>
+                </ul>
+            </div>
+        </div>
+        <!-- END COL -->
+
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12 text-center">
+
+            <div class="footer_copyright">
+                <p>
+                    &copy; 2026 Zentra. Todos los derechos reservados.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+```
+
+</div>
+<!-- END FOOTER -->

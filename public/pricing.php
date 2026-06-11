@@ -26,7 +26,7 @@
 				<div class="row">
 				  <div class="col-lg-12 col-sm-12 col-xs-12 text-center">
 					<div class="section-top-title">
-						<h1>Our Projects</h1>		
+						<h1>Planes de Zentra</h1>		
 					</div>
 				  </div><!--- END COL -->				  
 				</div><!--- END ROW -->
@@ -39,114 +39,131 @@
     <div class="row">
       <div class="col-lg-12 text-center">
         <div class="section-title">
-          <h2>Flexible Pricing</h2>
-          <p>Simple plans. No hidden fees.</p>
+          <h2>Planes flexibles</h2>
+          <p>Elige el plan que mejor se adapte al tamaño y operación de tu negocio.</p>
         </div>
       </div>
     </div>
 
     <div class="row justify-content-center">
 
-      <!-- BASIC -->
-      <div class="col-lg-4 col-md-6">
-        <div class="pricing_card">
-          <h4>Basic</h4>
-          <h2>$9<span>/mo</span></h2>
+      <!-- GRATIS -->
+<div class="col-lg-4 col-md-6">
+    <div class="pricing_card">
+        <h4>Gratis</h4>
+        <h2>$0<span>/mes</span></h2>
 
-          <ul>
+        <ul>
             <li><i class="fa fa-check"></i> 1 Usuario</li>
-            <li><i class="fa fa-check"></i> Acceso básico</li>
-            <li><i class="fa fa-check"></i> Soporte limitado</li>
-            <li class="disabled"><i class="fa fa-times"></i> Reportes</li>
-          </ul>
+            <li><i class="fa fa-check"></i> Facturación básica</li>
+            <li><i class="fa fa-check"></i> Inventario básico</li>
+            <li><i class="fa fa-check"></i> Soporte por correo</li>
+        </ul>
 
-          <a href="#" class="btn_pricing">Start Now</a>
-        </div>
-      </div>
+        <a href="#" class="btn_pricing">
+            Comenzar Gratis
+        </a>
+    </div>
+</div>
 
-      <!-- PRO (DESTACADO) -->
-      <div class="col-lg-4 col-md-6">
-        <div class="pricing_card featured">
-          <span class="badge_plan">POPULAR</span>
+<!-- LIGHT -->
+<div class="col-lg-4 col-md-6">
+    <div class="pricing_card">
+        <h4>Light</h4>
+        <h2>$6.99<span>/mes</span></h2>
 
-          <h4>Pro</h4>
-          <h2>$19<span>/mo</span></h2>
+        <ul>
+            <li><i class="fa fa-check"></i> Hasta 3 usuarios</li>
+            <li><i class="fa fa-check"></i> Facturación electrónica</li>
+            <li><i class="fa fa-check"></i> Inventario</li>
+            <li><i class="fa fa-check"></i> Soporte estándar</li>
+        </ul>
 
-          <ul>
-            <li><i class="fa fa-check"></i> 5 Usuarios</li>
-            <li><i class="fa fa-check"></i> Todo lo básico</li>
-            <li><i class="fa fa-check"></i> Soporte prioritario</li>
-            <li><i class="fa fa-check"></i> Reportes</li>
-          </ul>
+        <a href="#" class="btn_pricing">
+            Elegir Plan
+        </a>
+    </div>
+</div>
 
-          <a href="#" class="btn_pricing active_btn">Get Pro</a>
-        </div>
-      </div>
+<!-- PRO -->
+<div class="col-lg-4 col-md-6">
+    <div class="pricing_card featured">
 
-      <!-- PREMIUM -->
-      <div class="col-lg-4 col-md-6">
-        <div class="pricing_card">
-          <h4>Premium</h4>
-          <h2>$39<span>/mo</span></h2>
+        <span class="badge_plan">
+            RECOMENDADO
+        </span>
 
-          <ul>
-            <li><i class="fa fa-check"></i> Usuarios ilimitados</li>
-            <li><i class="fa fa-check"></i> Todo lo Pro</li>
-            <li><i class="fa fa-check"></i> Soporte 24/7</li>
+        <h4>Pro</h4>
+        <h2>$17.99<span>/mes</span></h2>
+
+        <ul>
+            <li><i class="fa fa-check"></i> Hasta 10 usuarios</li>
+            <li><i class="fa fa-check"></i> Todo lo de Light</li>
             <li><i class="fa fa-check"></i> Reportes avanzados</li>
-          </ul>
+            <li><i class="fa fa-check"></i> Soporte prioritario</li>
+        </ul>
 
-          <a href="#" class="btn_pricing">Go Premium</a>
-        </div>
-      </div>
+        <a href="#" class="btn_pricing active_btn">
+            Elegir Pro
+        </a>
+
+    </div>
+</div>
+<!-- ULTRA -->
+<div class="col-lg-4 col-md-6">
+    <div class="pricing_card">
+        <h4>Ultra</h4>
+        <h2>$34.99<span>/mes</span></h2>
+
+        <ul>
+            <li><i class="fa fa-check"></i> Usuarios ilimitados</li>
+            <li><i class="fa fa-check"></i> Todo lo de Pro</li>
+            <li><i class="fa fa-check"></i> Reportes ejecutivos</li>
+            <li><i class="fa fa-check"></i> Soporte 24/7</li>
+        </ul>
+
+        <a href="#" class="btn_pricing">
+            Elegir Ultra
+        </a>
+    </div>
+</div>
+
+<!-- ENTERPRISE -->
+<div class="col-lg-4 col-md-6">
+    <div class="pricing_card">
+
+        <h4>Enterprise</h4>
+
+        <h2>
+            Personalizado
+        </h2>
+
+        <ul>
+            <li><i class="fa fa-check"></i> Solución empresarial</li>
+            <li><i class="fa fa-check"></i> Integraciones avanzadas</li>
+            <li><i class="fa fa-check"></i> Implementación dedicada</li>
+            <li><i class="fa fa-check"></i> Soporte exclusivo</li>
+        </ul>
+
+        <a href="contact.php" class="btn_pricing">
+            Solicitar Cotización
+        </a>
+
+    </div>
+</div>
 
     </div>
   </div>
 </section>
-		<!-- START PORTFOLIO PROJECT -->
-		<section class="portfolio_project_area section-padding">
-			<div class="container">
-				<div class="row">
-				  <div class="col-lg-12 col-sm-12 col-xs-12">
-					<div class="single_project">
-						<img src="assets/img/portfolio/1.jpg" class="img-fluid" alt="portfolio" />
-						<h1>01</h1>
-						<h2>Website Design Agency</h2>
-						<p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry standard dummy text ever since the when an unknown printer took a galley of type and scrambled it to make a type specimen book. It is a long established fact that a reader.</p>
-						<a class="btn_one" href="single_project.html">View Project</a>
-					</div>
-				  </div><!--- END COL -->
-				  <div class="col-lg-12 col-sm-12 col-xs-12">
-					<div class="single_project">
-						<img src="assets/img/portfolio/2.jpg" class="img-fluid" alt="portfolio" />
-						<h1>02</h1>
-						<h2>Product Marketing</h2>
-						<p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry standard dummy text ever since the when an unknown printer took a galley of type and scrambled it to make a type specimen book. It is a long established fact that a reader.</p>
-						<a class="btn_one" href="single_project.html">View Project</a>
-					</div>
-				  </div><!--- END COL -->
-				  <div class="col-lg-12 col-sm-12 col-xs-12">
-					<div class="single_project">
-						<img src="assets/img/portfolio/3.jpg" class="img-fluid" alt="portfolio" />
-						<h1>03</h1>
-						<h2>App Development</h2>
-						<p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry standard dummy text ever since the when an unknown printer took a galley of type and scrambled it to make a type specimen book. It is a long established fact that a reader.</p>
-						<a class="btn_one" href="single_project.html">View Project</a>
-					</div>
-				  </div><!--- END COL -->
-				  <div class="col-lg-12 col-sm-12 col-xs-12">
-					<div class="single_project">
-						<img src="assets/img/portfolio/4.jpg" class="img-fluid" alt="portfolio" />
-						<h1>04</h1>
-						<h2>Business Strategy</h2>
-						<p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry standard dummy text ever since the when an unknown printer took a galley of type and scrambled it to make a type specimen book. It is a long established fact that a reader.</p>
-						<a class="btn_one" href="single_project.html">View Project</a>
-					</div>
-				  </div><!--- END COL -->				  
-				</div><!--- END ROW -->
-			</div><!--- END CONTAINER -->
-		</section>
-		<!-- END PORTFOLIO PROJECT -->
+<div class="text-center mt-5">
+    <h3>¿No sabes qué plan elegir?</h3>
+    <p>
+        Nuestro equipo puede ayudarte a encontrar la solución ideal para tu negocio.
+    </p>
+    <a href="contact.php" class="btn_one">
+        Contáctanos
+    </a>
+</div>
 		
 		<!-- START FOOTER -->
 		<?php include 'partials/footer.php'; ?>

@@ -1,11 +1,9 @@
 
 
 .site-navbar {
-margin-bottom: 0px;
-z-index: 1999;
-position: absolute;
-top: 0;
-width: 100%; }
+    background: transparent !important;
+    box-shadow: none !important;
+}
 .site-navbar .site-logo {
 position: relative;
 left: 0;
@@ -13,7 +11,7 @@ font-size: 24px; }
 .site-navbar .site-navigation .site-menu {
 margin-bottom: 0;float: right; }
 .site-navbar .site-navigation .site-menu .active {
-color: #ffaa17;
+color: #1760ff;
 display: inline-block;
 padding: 20px 20px; }
 .site-navbar .site-navigation .site-menu a {
@@ -22,14 +20,11 @@ display: inline-block; }
 .site-navbar .site-navigation .site-menu > li {
 display: inline-block; }
 .site-navbar .site-navigation .site-menu > li > a {
-	padding: 25px 20px;
-	font-size: 16px;
-	text-transform: capitalize;
-	display: inline-block;
-	text-decoration: none !important;
+    color: #1d293e !important;
 }
 .site-navbar .site-navigation .site-menu > li > a:hover {
-color: #ffaa17; }
+    color: #1760ff !important;
+}
 .site-navbar .site-navigation .site-menu > li.social > a {
 padding-left: 5px;
 padding-right: 5px; }
@@ -277,19 +272,31 @@ color: #fff; }
 .sticky-wrapper .site-navbar .site-logo a {
 color: #fff; }
 .sticky-wrapper .site-navbar .site-menu > li > a {
-color: #fff !important; }
+color: #0f172a !important; }
 .sticky-wrapper .site-navbar .site-menu > li > a:hover, .sticky-wrapper .site-navbar .site-menu > li > a.active {
 color: #fff !important; }
 .sticky-wrapper.is-sticky .site-navbar {
-background: #fff;
-border-bottom: 1px solid transparent;
--webkit-box-shadow: 4px 0 20px -5px rgba(0, 0, 0, 0.3);
-box-shadow: 4px 0 20px -5px rgba(0, 0, 0, 0.3); }
+    background: #fff !important;
+    border-bottom: 1px solid transparent;
+    box-shadow: 4px 0 20px -5px rgba(0, 0, 0, 0.18);
+}
 .sticky-wrapper.is-sticky .site-navbar .site-menu-toggle {
-color: #000; }
+    color: #1d293e !important;
+}
 .sticky-wrapper.is-sticky .site-navbar .site-logo a {
-color: #ffaa17; }
+    color: #1760ff !important;
+}
 .sticky-wrapper.is-sticky .site-navbar .site-menu > li > a {
-color: #000 !important; }
-.sticky-wrapper.is-sticky .site-navbar .site-menu > li > a:hover, .sticky-wrapper.is-sticky .site-navbar .site-menu > li > a.active {
-color: #ffaa17 !important; }
+    color: #1d293e !important;
+}
+.sticky-wrapper.is-sticky .site-navbar .site-menu > li > a:hover,
+.sticky-wrapper.is-sticky .site-navbar .site-menu > li > a.active {
+    color: #1760ff !important;
+}
+
+.section-top-title p{
+    color:#fff;
+    margin-top:10px;
+    font-size:18px;
+    opacity:.9;
+}
