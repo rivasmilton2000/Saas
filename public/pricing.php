@@ -1,3 +1,8 @@
+<?php 
+   require_once __DIR__ . '/../src/includes/plansService.php';
+
+   $planes = getActivePlansWithFeatures($pdo);
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -47,110 +52,71 @@
 
     <div class="row justify-content-center">
 
-      <!-- GRATIS -->
-<div class="col-lg-4 col-md-6">
-    <div class="pricing_card">
-        <h4>Gratis</h4>
-        <h2>$0<span>/mes</span></h2>
+    <?php foreach ($planes as $plan): ?>
+        <?php 
+           $isFeatured = dbBoolValue($plan['destacado'] ?? false);    
+           $precio = $plan['precio'];
 
-        <ul>
-            <li><i class="fa fa-check"></i> 1 Usuario</li>
-            <li><i class="fa fa-check"></i> Facturación básica</li>
-            <li><i class="fa fa-check"></i> Inventario básico</li>
-            <li><i class="fa fa-check"></i> Soporte por correo</li>
-        </ul>
+           if($precio === null)
+            {
+                $precioTexto = 'Personalizado';
+                $periodoTexto = '';
+            }else
+            {
+                $precioTexto = '$' . number_format((float)$precio, 2);
+                $periodoTexto = '/' . htmlspecialchars($plan['periodo'] ?? 'mes');
+            }
 
-        <a href="#" class="btn_pricing">
-            Comenzar Gratis
-        </a>
-    </div>
-</div>
+            $buttonText = $precio === null ? 'Solicitar Cotización' : 'Elegir Plan';
+            if(strtolower($plan['nombre']) == 'gratis')
+                {
+                    $buttonText = 'Comenzar Gratis';
+                }
+            
+            $buttonHref = $precio === null ? 'contact.php' : '#';
+        ?>
 
-<!-- LIGHT -->
-<div class="col-lg-4 col-md-6">
-    <div class="pricing_card">
-        <h4>Light</h4>
-        <h2>$6.99<span>/mes</span></h2>
+        <div class="col-lg-4 col-md-6">
+            <div class="pricing_card <?= $isFeatured ? 'featured' : '' ?>">
 
-        <ul>
-            <li><i class="fa fa-check"></i> Hasta 3 usuarios</li>
-            <li><i class="fa fa-check"></i> Facturación electrónica</li>
-            <li><i class="fa fa-check"></i> Inventario</li>
-            <li><i class="fa fa-check"></i> Soporte estándar</li>
-        </ul>
+                <?php if ($isFeatured): ?>
+                  <span class="badge_plan">RECOMENDADO</span>
+                <?php endif; ?>
 
-        <a href="#" class="btn_pricing">
-            Elegir Plan
-        </a>
-    </div>
-</div>
+                <h4><?= htmlspecialchars($plan['nombre']) ?></h4>
 
-<!-- PRO -->
-<div class="col-lg-4 col-md-6">
-    <div class="pricing_card featured">
+                <h2>
+                   <?= $precioTexto ?>
+                   <?php if ($periodoTexto !== ''): ?>
+                    <span><?= $periodoTexto ?></span>
+                   <?php endif; ?>
+                </h2>
 
-        <span class="badge_plan">
-            RECOMENDADO
-        </span>
+                <?php if(!empty($plan['descripcion'])): ?>
+                    <p><?= htmlspecialchars($plan['descripcion']) ?></p>
+                <?php endif; ?>
+                
+                <ul>
+                    <?php foreach (($plan['caracteristicas'] ?? []) as $caracteristica): ?>
+                        <li class="<?= dbBoolValue($caracteristica['incluido'] ?? true) ? '' : 'disabled' ?>">
+                            <?php if (dbBoolValue($caracteristica['incluido'] ?? true)): ?>
+                                <i class="fa fa-check"></i>
+                            <?php else: ?>
+                                <i class="fa fa-times"></i>
+                            <?php endif; ?> 
 
-        <h4>Pro</h4>
-        <h2>$17.99<span>/mes</span></h2>
+                            <?= htmlspecialchars($caracteristica['caracteristica']) ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
 
-        <ul>
-            <li><i class="fa fa-check"></i> Hasta 10 usuarios</li>
-            <li><i class="fa fa-check"></i> Todo lo de Light</li>
-            <li><i class="fa fa-check"></i> Reportes avanzados</li>
-            <li><i class="fa fa-check"></i> Soporte prioritario</li>
-        </ul>
-
-        <a href="#" class="btn_pricing active_btn">
-            Elegir Pro
-        </a>
-
-    </div>
-</div>
-<!-- ULTRA -->
-<div class="col-lg-4 col-md-6">
-    <div class="pricing_card">
-        <h4>Ultra</h4>
-        <h2>$34.99<span>/mes</span></h2>
-
-        <ul>
-            <li><i class="fa fa-check"></i> Usuarios ilimitados</li>
-            <li><i class="fa fa-check"></i> Todo lo de Pro</li>
-            <li><i class="fa fa-check"></i> Reportes ejecutivos</li>
-            <li><i class="fa fa-check"></i> Soporte 24/7</li>
-        </ul>
-
-        <a href="#" class="btn_pricing">
-            Elegir Ultra
-        </a>
-    </div>
-</div>
-
-<!-- ENTERPRISE -->
-<div class="col-lg-4 col-md-6">
-    <div class="pricing_card">
-
-        <h4>Enterprise</h4>
-
-        <h2>
-            Personalizado
-        </h2>
-
-        <ul>
-            <li><i class="fa fa-check"></i> Solución empresarial</li>
-            <li><i class="fa fa-check"></i> Integraciones avanzadas</li>
-            <li><i class="fa fa-check"></i> Implementación dedicada</li>
-            <li><i class="fa fa-check"></i> Soporte exclusivo</li>
-        </ul>
-
-        <a href="contact.php" class="btn_pricing">
-            Solicitar Cotización
-        </a>
-
-    </div>
-</div>
+                <a href="<?= $buttonHref ?>" class="btn_pricing <?= $isFeatured ? 'active_btn' : '' ?>">
+                    <?= $buttonText ?>
+                </a>
+            </div>
+        </div>
+    
+    <?php endforeach; ?>
 
     </div>
   </div>

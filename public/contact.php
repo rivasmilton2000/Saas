@@ -59,7 +59,7 @@ require_once __DIR__ . '/../src/includes/contactService.php';
                 </div>
             </div>
 
-            <div class="col-lg-4 col-md-6 col-sm-12">
+            <div class="col-lg-4 col-md-6 col-sm-12">   
                 <div class="contact_info_card">
                     <i class="fa fa-phone"></i>
                     <h4>Teléfono</h4>
