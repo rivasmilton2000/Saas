@@ -2,5 +2,7 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../../');
-$dotenv->load();
+$workspaceRoot = dirname(__DIR__, 2);
+if (class_exists('Dotenv\\Dotenv') && file_exists($workspaceRoot . '/.env')) {
+    Dotenv\Dotenv::createImmutable($workspaceRoot)->safeLoad();
+}

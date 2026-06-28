@@ -25,8 +25,19 @@ function isAdmin(): bool {
     return isLoggedIn() && (($_SESSION['rol'] ?? null) === 'admin');
 }
 
+function isUser(): bool {
+    return isLoggedIn() && (($_SESSION['rol'] ?? 'user') === 'user');
+}
+
 function requireAdmin(): void {
     if (!isAdmin()) {
+        header('Location: /Saas/src/index.php');
+        exit;
+    }
+}
+
+function requireUser(): void {
+    if (!isUser()) {
         header('Location: /Saas/src/index.php');
         exit;
     }
@@ -35,8 +46,12 @@ function requireAdmin(): void {
 function sessionData(): array {
     return [
         'id_usuario' => $_SESSION['id_usuario'] ?? null,
-        'username'   => $_SESSION['username']   ?? null,
-        'rol'        => $_SESSION['rol']         ?? null,
+        'username'   => $_SESSION['username'] ?? null,
+        'rol'        => $_SESSION['rol'] ?? null,
+        'nombre_completo' => $_SESSION['nombre_completo'] ?? null,
+        'pais' => $_SESSION['pais'] ?? null,
+        'id_plan' => $_SESSION['id_plan'] ?? null,
+        'plan_nombre' => $_SESSION['plan_nombre'] ?? null,
     ];
 }
 

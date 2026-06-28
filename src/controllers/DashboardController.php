@@ -5,7 +5,10 @@ require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
 require_once __DIR__ . '/../models/UsuarioModel.php';
+require_once __DIR__ . '/../models/PlanModel.php';
+require_once __DIR__ . '/../services/AdminDashboardService.php';
 require_once __DIR__ . '/../services/CentroMandoService.php';
+require_once __DIR__ . '/../config/countries.php';
 
 class DashboardController {
 
@@ -25,6 +28,9 @@ class DashboardController {
             'admins' => 0,
             'users'  => 0,
         ];
+        $planOptions = [];
+        $countryOptions = getCountryOptions();
+        $adminDashboard = [];
         $librosPorTipo = [];
 
         foreach (getLibroModules() as $tipo => $modulo) {
@@ -51,6 +57,8 @@ class DashboardController {
         if (isAdmin()) {
             $usuarios = UsuarioModel::getActivos($pdo);
             $usuariosStats = UsuarioModel::getResumen($pdo);
+            $planOptions = PlanModel::getSelectablePlans($pdo);
+            $adminDashboard = AdminDashboardService::build($pdo);
         }
 
         $centroMando = CentroMandoService::build($empresas, $libros, $cuota, $pdo, $idUsuario);
@@ -65,6 +73,9 @@ class DashboardController {
             'libro_activo'   => $libroActivo,
             'usuarios'       => $usuarios,
             'usuarios_stats' => $usuariosStats,
+            'plan_options'   => $planOptions,
+            'country_options'=> $countryOptions,
+            'admin_dashboard'=> $adminDashboard,
             'centro_mando'   => $centroMando,
         ];
     }

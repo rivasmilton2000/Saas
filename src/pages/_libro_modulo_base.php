@@ -7,8 +7,10 @@ require_once __DIR__ . '/../models/LibroModel.php';
 require_once __DIR__ . '/../models/FacturasCuotaModel.php';
 require_once __DIR__ . '/../services/BitacoraService.php';
 require_once __DIR__ . '/../services/LibroVistaService.php';
+require_once __DIR__ . '/../services/PageVisitService.php';
 
 requireLogin();
+requireUser();
 
 $tipoLibro = trim((string) ($tipoLibroPagina ?? ''));
 $modulo    = getLibroModule($tipoLibro);
@@ -73,6 +75,12 @@ $registrarBitacora = static function (
         ], $opciones)
     );
 };
+PageVisitService::track(
+    $pdo,
+    $session,
+    'modulo_' . (string) ($modulo['tipo'] ?? 'libro'),
+    (string) ($modulo['nombre'] ?? 'Modulo')
+);
 
 $leerDocumentosSubidos = static function (array $files): array {
     $documentos = [];
@@ -469,7 +477,7 @@ if ($modalInicial === '') {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title><?php echo htmlspecialchars((string) ($modulo['nombre'] ?? 'Modulo')); ?> - Saas Contabilidad</title>
+    <title><?php echo htmlspecialchars((string) ($modulo['nombre'] ?? 'Modulo')); ?> - Zentra</title>
     <link rel="stylesheet" href="../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../assets/vendors/css/vendor.bundle.base.css">

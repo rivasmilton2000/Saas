@@ -12,12 +12,12 @@ $error = htmlspecialchars($_GET['error'] ?? '');
 $flash = getFlash('login');
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Skydash Admin</title>
+    <title>Acceso - Zentra</title>
     <!-- plugins:css -->
     <link rel="stylesheet" href="../../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../../assets/vendors/ti-icons/css/themify-icons.css">
@@ -40,10 +40,10 @@ $flash = getFlash('login');
             <div class="col-lg-4 mx-auto">
               <div class="auth-form-light text-left py-5 px-4 px-sm-5">
                 <div class="brand-logo">
-                  <img src="../../assets/images/logo.svg" alt="logo">
+                  <img src="../../assets/images/logo.svg" alt="Zentra">
                 </div>
-                <h4>Hello! let's get started</h4>
-                <h6 class="font-weight-light">Sign in to continue.</h6>
+                <h4>Ingresa a Zentra</h4>
+                <h6 class="font-weight-light">Accede a tu panel y continua con tus modulos.</h6>
                 <form class="pt-3" method="POST" action="">
                   <?php if ($flash): ?>
                   <div class="alert alert-<?php echo ($flash['type'] ?? 'info') === 'success' ? 'success' : 'info'; ?>" role="alert">
@@ -54,32 +54,21 @@ $flash = getFlash('login');
                   <div class="alert alert-danger" role="alert"><?php echo $error; ?></div>
                   <?php endif; ?>
                   <div class="form-group">
-                    <input type="text" name="username" class="form-control form-control-lg" id="exampleInputEmail1" placeholder="Username">
+                    <input type="text" name="username" class="form-control form-control-lg" id="exampleInputEmail1" placeholder="Usuario" autocomplete="username" required>
                   </div>
                   <div class="form-group">
-                    <input type="password" name="password" class="form-control form-control-lg" id="exampleInputPassword1" placeholder="Password">
+                    <input type="password" name="password" class="form-control form-control-lg" id="exampleInputPassword1" placeholder="Contrasena" autocomplete="current-password" required>
                   </div>
                   <div class="mt-3 d-grid gap-2">
-                    <button type="submit" class="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn">SIGN IN</button>
+                    <button type="submit" class="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn">ENTRAR</button>
                   </div>
                   <div class="mt-3 d-grid gap-2">
                     <button type="button" onclick="window.location.href='/Saas/public/index.php'" 
                      class="btn btn-block btn-primary btn-lg font-weight-medium auth-form-btn">
-                     BACK TO HOME
+                     VOLVER AL SITIO
                     </button>
                   </div>
-                  <div class="my-2 d-flex justify-content-between align-items-center">
-                    <div class="form-check">
-                      <label class="form-check-label text-muted">
-                        <input type="checkbox" class="form-check-input"> Keep me signed in </label>
-                    </div>
-                    <a href="#" class="auth-link text-black">Forgot password?</a>
-                  </div>
-                  <div class="mb-2 d-grid gap-2">
-                    <button type="button" class="btn btn-block btn-facebook auth-form-btn">
-                      <i class="ti-facebook me-2"></i>Connect using facebook </button>
-                  </div>
-                  <div class="text-center mt-4 font-weight-light"> Don't have an account? <a href="register.php" class="text-primary">Create</a>
+                  <div class="text-center mt-4 font-weight-light"> No tienes una cuenta? <a href="register.php" class="text-primary">Crear cuenta</a>
                   </div>
                 </form>
               </div>

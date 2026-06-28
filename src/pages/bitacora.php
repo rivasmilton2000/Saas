@@ -3,8 +3,10 @@ require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../services/BitacoraService.php';
+require_once __DIR__ . '/../services/PageVisitService.php';
 
 requireLogin();
+requireAdmin();
 
 $session   = sessionData();
 $idUsuario = (int) ($session['id_usuario'] ?? 0);
@@ -15,6 +17,7 @@ $idEmpresaActiva = getActiveEmpresaId();
 $empresaActivaNavbar = $idEmpresaActiva ? EmpresaModel::getById($pdo, $idEmpresaActiva, $idUsuario) : null;
 $filtroUsuario = $esAdmin ? (int) ($_GET['usuario'] ?? 0) : 0;
 $bitacora = BitacoraService::obtenerVista($pdo, $idUsuario, $esAdmin, $filtroUsuario > 0 ? $filtroUsuario : null);
+PageVisitService::track($pdo, $session, 'bitacora', 'Bitacora');
 
 $ultimaActividadTexto = '-';
 if (!empty($bitacora['resumen']['ultima_actividad'])) {
@@ -31,7 +34,7 @@ if (!empty($bitacora['resumen']['ultima_actividad'])) {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Bitacora - Saas Contabilidad</title>
+    <title>Bitacora - Zentra</title>
     <link rel="stylesheet" href="../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../assets/vendors/css/vendor.bundle.base.css">

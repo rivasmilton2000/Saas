@@ -44,6 +44,10 @@ if (!function_exists('dbDriverName')) {
         return dbBoolValue($value) ? 1 : 0;
     }
 
+    function dbBoolParam($value): string {
+        return dbBoolValue($value) ? 'true' : 'false';
+    }
+
     function dbColumnExists(PDO $pdo, string $table, string $column): bool {
         $stmt = $pdo->prepare(
             'SELECT 1

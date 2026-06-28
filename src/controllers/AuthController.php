@@ -37,6 +37,12 @@ class AuthController {
         $_SESSION['id_usuario'] = $usuario['id'];
         $_SESSION['username']   = $usuario['username'];
         $_SESSION['rol']        = $usuario['rol'];
+        $_SESSION['nombre_completo'] = $usuario['nombre_completo'] ?? null;
+        $_SESSION['pais'] = $usuario['pais'] ?? 'El Salvador';
+        $_SESSION['id_plan'] = $usuario['id_plan'] ?? null;
+        $_SESSION['plan_nombre'] = $usuario['plan_nombre'] ?? null;
+
+        UsuarioModel::markLogin($pdo, (int) $usuario['id']);
 
         BitacoraService::registrar(
             $pdo,

@@ -1,6 +1,6 @@
 <footer class="footer">
   <div class="d-sm-flex justify-content-center justify-content-sm-between">
-    <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">Modulo de libros de facturas</span>
-    <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Saas Contabilidad</span>
+    <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">Modulos operativos de Zentra</span>
+    <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Panel Zentra</span>
   </div>
 </footer>

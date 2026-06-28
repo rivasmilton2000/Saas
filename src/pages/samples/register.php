@@ -22,7 +22,7 @@ $old = array_merge([
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Registro - Saas Contabilidad</title>
+    <title>Registro - Zentra</title>
     <link rel="stylesheet" href="../../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../../assets/vendors/css/vendor.bundle.base.css">
@@ -39,10 +39,10 @@ $old = array_merge([
             <div class="col-lg-4 mx-auto">
               <div class="auth-form-light text-left py-5 px-4 px-sm-5">
                 <div class="brand-logo">
-                  <img src="../../assets/images/logo.svg" alt="logo">
+                  <img src="../../assets/images/logo.svg" alt="Zentra">
                 </div>
                 <h4>Crea tu cuenta</h4>
-                <h6 class="font-weight-light">Registra un perfil para entrar al sistema.</h6>
+                <h6 class="font-weight-light">Registra un perfil para entrar a Zentra y usar los modulos asignados.</h6>
                 <form class="pt-3" method="POST" action="">
                   <?php if ($flash): ?>
                   <div class="alert alert-<?php echo ($flash['type'] ?? 'info') === 'danger' ? 'danger' : 'info'; ?>" role="alert">
@@ -72,7 +72,7 @@ $old = array_merge([
                   <?php else: ?>
                   <input type="hidden" name="rol" value="user">
                   <div class="alert alert-light border" role="alert">
-                    El registro publico crea cuentas tipo <strong>user</strong>. Los perfiles <strong>admin</strong> se agregan desde el dashboard.
+                    El registro publico crea cuentas tipo <strong>user</strong> con plan <strong>Free</strong>. Los perfiles <strong>admin</strong> se agregan desde el dashboard.
                   </div>
                   <?php endif; ?>
                   <div class="form-group">

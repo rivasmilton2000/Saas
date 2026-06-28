@@ -8,6 +8,7 @@ require_once __DIR__ . '/models/UsuarioModel.php';
 require_once __DIR__ . '/services/BitacoraService.php';
 require_once __DIR__ . '/services/CentroMandoService.php';
 require_once __DIR__ . '/services/DatabaseBackupService.php';
+require_once __DIR__ . '/services/PageVisitService.php';
 
 requireLogin();
 
@@ -455,6 +456,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $data = DashboardController::getData($idUsuario);
+PageVisitService::track(
+    $pdo,
+    $session,
+    $esAdmin ? 'dashboard_admin' : 'panel_usuario',
+    $esAdmin ? 'Panel admin' : 'Panel de usuario'
+);
 $modulosLibros = array_filter(
     getLibroModules(),
     static fn(array $modulo): bool => ($modulo['visible_dashboard'] ?? false) === true
@@ -462,6 +469,19 @@ $modulosLibros = array_filter(
 $centroMando = is_array($data['centro_mando'] ?? null) ? $data['centro_mando'] : [];
 $flash = getFlash('dashboard');
 $flashMeta = $flash['meta'] ?? [];
+$planOptions = is_array($data['plan_options'] ?? null) ? $data['plan_options'] : [];
+$countryOptions = is_array($data['country_options'] ?? null) ? $data['country_options'] : [];
+$adminDashboardData = is_array($data['admin_dashboard'] ?? null) ? $data['admin_dashboard'] : [];
+$defaultUserPlanId = 0;
+
+foreach ($planOptions as $planOption) {
+    if ((string) ($planOption['slug'] ?? '') === 'free') {
+        $defaultUserPlanId = (int) ($planOption['id_plan'] ?? 0);
+        break;
+    }
+}
+
+$defaultCountry = array_key_exists('El Salvador', $countryOptions) ? 'El Salvador' : (string) array_key_first($countryOptions);
 $companyFormData = array_merge([
     'nombre'        => '',
     'iniciales'     => '',
@@ -474,11 +494,15 @@ $companyFormData = array_merge([
 $profileFormData = array_merge([
     'username' => '',
     'rol'      => 'user',
+    'pais'     => $defaultCountry,
+    'id_plan'  => $defaultUserPlanId,
 ], is_array($flashMeta['user_old'] ?? null) ? $flashMeta['user_old'] : []);
 $editProfileFormData = array_merge([
     'id'       => 0,
     'username' => '',
     'rol'      => 'user',
+    'pais'     => $defaultCountry,
+    'id_plan'  => $defaultUserPlanId,
 ], is_array($flashMeta['edit_user_old'] ?? null) ? $flashMeta['edit_user_old'] : []);
 $roleLabels = [
     'admin' => 'Administrador',
@@ -528,7 +552,7 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Dashboard - Saas Contabilidad</title>
+    <title>Panel - Zentra</title>
     <link rel="stylesheet" href="assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="assets/vendors/css/vendor.bundle.base.css">
@@ -1381,6 +1405,182 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         flex-wrap: wrap;
       }
 
+      .admin-hub-hero {
+        border: 1px solid rgba(75, 73, 172, 0.08);
+        background: linear-gradient(135deg, #ffffff 0%, #f5f7ff 58%, #eef2ff 100%);
+        box-shadow: 0 20px 44px rgba(15, 23, 42, 0.06);
+      }
+
+      .admin-hub-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.85fr);
+        gap: 1.25rem;
+      }
+
+      .admin-hub-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.8rem;
+        color: #4b49ac;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .admin-hub-title {
+        margin: 0;
+        color: #111827;
+        font-size: 1.65rem;
+        font-weight: 700;
+      }
+
+      .admin-hub-copy {
+        margin: 0.75rem 0 0;
+        max-width: 44rem;
+        color: #64748b;
+        font-size: 0.95rem;
+      }
+
+      .admin-hub-side {
+        display: grid;
+        gap: 0.85rem;
+      }
+
+      .admin-hub-side-card {
+        padding: 1rem 1.05rem;
+        border-radius: 18px;
+        border: 1px solid rgba(75, 73, 172, 0.1);
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .admin-hub-side-card span,
+      .admin-summary-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: #7c8699;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .admin-hub-side-card strong,
+      .admin-summary-value {
+        display: block;
+        color: #111827;
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+
+      .admin-hub-side-card small,
+      .admin-summary-note {
+        color: #64748b;
+      }
+
+      .admin-summary-card {
+        border: 1px solid rgba(75, 73, 172, 0.08);
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+      }
+
+      .admin-plan-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+      }
+
+      .admin-plan-card {
+        padding: 1rem 1.05rem;
+        border-radius: 20px;
+        border: 1px solid #e6eaf3;
+        background: #fbfcff;
+      }
+
+      .admin-plan-card.is-featured {
+        border-color: rgba(75, 73, 172, 0.28);
+        box-shadow: 0 16px 34px rgba(75, 73, 172, 0.12);
+      }
+
+      .admin-plan-name {
+        display: block;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .admin-plan-price {
+        display: block;
+        margin-top: 0.15rem;
+        color: #4b49ac;
+        font-size: 1.15rem;
+        font-weight: 700;
+      }
+
+      .admin-plan-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 108px;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(75, 73, 172, 0.08);
+        color: #4b49ac;
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .admin-plan-copy {
+        margin: 0.85rem 0 0.7rem;
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+
+      .admin-plan-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .admin-plan-limits {
+        margin-top: 0.7rem;
+        color: #7c8699;
+        font-size: 0.78rem;
+      }
+
+      .admin-route-card {
+        height: 100%;
+        padding: 1rem 1.05rem;
+        border-radius: 18px;
+        border: 1px solid #e5e8f1;
+        background: #fbfcff;
+      }
+
+      .admin-route-card span {
+        display: block;
+        margin-bottom: 0.3rem;
+        color: #7c8699;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .admin-route-card strong {
+        display: block;
+        color: #111827;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .admin-route-card small {
+        color: #64748b;
+      }
+
       @media (max-width: 991.98px) {
         .command-metrics-grid {
           width: 100%;
@@ -1398,6 +1598,11 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         .empresa-modal-sidebar {
           border-right: 0;
           border-bottom: 1px solid rgba(75, 73, 172, 0.08);
+        }
+
+        .admin-plan-grid,
+        .admin-hub-grid {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -1568,15 +1773,17 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         <?php include __DIR__ . '/partials/_sidebar.php'; ?>
         <div class="main-panel">
           <div class="content-wrapper">
+            <?php if (!$esAdmin): ?>
             <?php include __DIR__ . '/partials/_command_center_dashboard.php'; ?>
-            <?php if (false): ?>
+            <?php endif; ?>
+            <?php if (!$esAdmin): ?>
             <div class="row mb-4">
               <div class="col-12">
                 <div class="card">
                   <div class="card-body">
-                    <h3 class="card-title mb-1">Dashboard</h3>
+                    <h3 class="card-title mb-1">Centro de trabajo</h3>
                     <p class="text-muted mb-0">
-                      Gestiona tu primera empresa y entra a tus libros de facturas.
+                      Gestiona tu empresa activa y entra rapido a los modulos contables que si vas a trabajar.
                     </p>
                   </div>
                 </div>
@@ -1709,69 +1916,13 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
             <?php endif; ?>
 
             <?php if ($esAdmin): ?>
-            <?php $backupOverview = is_array($backupDashboard['overview'] ?? null) ? $backupDashboard['overview'] : []; ?>
-            <?php $backupToday = $backupOverview['today_backup'] ?? null; ?>
-            <?php $backupLatest = $backupOverview['latest_backup'] ?? null; ?>
-            <div class="row mb-4">
-              <div class="col-12">
-                <div class="card admin-backup-card">
-                  <div class="card-body">
-                    <div class="admin-backup-grid">
-                      <div>
-                        <span class="admin-backup-kicker"><i class="mdi mdi-database-lock-outline"></i> Respaldo diario admin</span>
-                        <h4 class="admin-backup-title">El panel admin ya controla el backup diario</h4>
-                        <p class="admin-backup-copy">
-                          Cada vez que entra un administrador, el sistema valida si ya existe el respaldo de hoy para la base PostgreSQL y lo genera solo una vez por dia.
-                        </p>
-                        <div class="d-flex flex-wrap gap-2 mt-3">
-                          <span class="admin-backup-status <?php echo $backupToday ? 'admin-backup-status--ok' : 'admin-backup-status--warn'; ?>">
-                            <i class="mdi <?php echo $backupToday ? 'mdi-check-decagram-outline' : 'mdi-alert-outline'; ?>"></i>
-                            <?php echo $backupToday ? 'Backup del dia listo' : 'Pendiente de generar'; ?>
-                          </span>
-                          <?php if ($backupDashboard['error']): ?>
-                          <span class="admin-backup-status admin-backup-status--warn">
-                            <i class="mdi mdi-alert-circle-outline"></i>
-                            Revisar modulo de backups
-                          </span>
-                          <?php endif; ?>
-                        </div>
-                        <?php if ($backupDashboard['error']): ?>
-                        <div class="alert alert-warning mt-3 mb-0">
-                          <?php echo htmlspecialchars((string) $backupDashboard['error']); ?>
-                        </div>
-                        <?php endif; ?>
-                        <div class="d-flex flex-wrap gap-2 mt-3">
-                          <a href="pages/backups.php" class="btn btn-primary">Abrir modulo</a>
-                          <?php if ($backupLatest): ?>
-                          <a href="pages/backups.php?download=<?php echo rawurlencode((string) ($backupLatest['name'] ?? '')); ?>" class="btn btn-outline-secondary">Descargar ultimo</a>
-                          <?php endif; ?>
-                        </div>
-                      </div>
-                      <div class="admin-backup-stats">
-                        <div class="admin-backup-stat">
-                          <span>Total backups</span>
-                          <strong><?php echo (int) ($backupOverview['total_backups'] ?? 0); ?></strong>
-                        </div>
-                        <div class="admin-backup-stat">
-                          <span>Ultimo generado</span>
-                          <strong><?php echo htmlspecialchars((string) ($backupLatest['created_at_label'] ?? '-')); ?></strong>
-                        </div>
-                        <div class="admin-backup-stat">
-                          <span>Tamano ultimo</span>
-                          <strong><?php echo htmlspecialchars((string) ($backupLatest['size_label'] ?? '-')); ?></strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <?php include __DIR__ . '/partials/_admin_dashboard.php'; ?>
             <div class="row">
               <div class="col-lg-4 grid-margin stretch-card">
                 <div class="card">
                   <div class="card-body">
-                    <h4 class="card-title">Perfiles</h4>
-                    <p class="card-description mb-3">Agrega mas accesos y define si cada cuenta sera `user` o `admin`.</p>
+                    <h4 class="card-title">Gestion de cuentas</h4>
+                    <p class="card-description mb-3">Crea perfiles cliente, asigna membresias segun el documento y controla que pais y acceso tiene cada cuenta.</p>
                     <div class="mb-3">
                       <strong>Activos:</strong> <?php echo (int) ($data['usuarios_stats']['total'] ?? 0); ?><br>
                       <strong>Admins:</strong> <?php echo (int) ($data['usuarios_stats']['admins'] ?? 0); ?><br>
@@ -1792,7 +1943,7 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                 <div class="card">
                   <div class="card-body">
                     <h4 class="card-title">Usuarios registrados</h4>
-                    <p class="card-description">Vista rapida de los perfiles activos dentro del sistema.</p>
+                    <p class="card-description">Vista rapida de acceso, membresia, pais y actividad de cada cuenta activa.</p>
                     <?php if (!empty($data['usuarios'])): ?>
                     <div class="table-responsive">
                       <table class="table table-sm">
@@ -1800,13 +1951,21 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                           <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
-                            <th>Alta</th>
+                            <th>Membresia</th>
+                            <th>Pais</th>
+                            <th>Ultima actividad</th>
                             <th>Acciones</th>
                           </tr>
                         </thead>
                         <tbody>
                           <?php foreach ($data['usuarios'] as $usuario): ?>
-                          <?php $rolUsuario = (string) ($usuario['rol'] ?? 'user'); ?>
+                          <?php
+                            $rolUsuario = (string) ($usuario['rol'] ?? 'user');
+                            $planNombre = (string) ($usuario['plan_nombre'] ?? ($rolUsuario === 'admin' ? 'Interno' : 'Free'));
+                            $paisUsuario = (string) ($usuario['pais'] ?? 'El Salvador');
+                            $ultimaActividad = !empty($usuario['ultima_actividad_at']) ? strtotime((string) $usuario['ultima_actividad_at']) : false;
+                            $ultimaActividadTexto = $ultimaActividad ? date('d/m/Y h:i A', $ultimaActividad) : 'Sin actividad';
+                          ?>
                           <tr>
                             <td>
                               <?php echo htmlspecialchars((string) $usuario['username']); ?>
@@ -1819,12 +1978,9 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                                 <?php echo htmlspecialchars($roleLabels[$rolUsuario] ?? ucfirst($rolUsuario)); ?>
                               </span>
                             </td>
-                            <td>
-                              <?php
-                              $fechaAlta = !empty($usuario['created_at']) ? strtotime((string) $usuario['created_at']) : false;
-                              echo $fechaAlta ? htmlspecialchars(date('d/m/Y', $fechaAlta)) : '-';
-                              ?>
-                            </td>
+                            <td><?php echo htmlspecialchars($planNombre); ?></td>
+                            <td><?php echo htmlspecialchars($paisUsuario); ?></td>
+                            <td><?php echo htmlspecialchars($ultimaActividadTexto); ?></td>
                             <td>
                               <div class="profile-actions">
                                 <button
@@ -1833,6 +1989,8 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                                   data-user-id="<?php echo (int) $usuario['id']; ?>"
                                   data-user-username="<?php echo htmlspecialchars((string) $usuario['username'], ENT_QUOTES); ?>"
                                   data-user-role="<?php echo htmlspecialchars($rolUsuario, ENT_QUOTES); ?>"
+                                  data-user-country="<?php echo htmlspecialchars($paisUsuario, ENT_QUOTES); ?>"
+                                  data-user-plan-id="<?php echo (int) ($usuario['id_plan'] ?? 0); ?>"
                                 >
                                   Editar
                                 </button>
@@ -1863,7 +2021,9 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
             <?php endif; ?>
           </div>
 
+          <?php if (!$esAdmin): ?>
           <?php include __DIR__ . '/partials/_command_center_modals.php'; ?>
+          <?php endif; ?>
 
           <div class="modal fade empresa-modal" id="empresaModal" tabindex="-1" aria-labelledby="empresaModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered empresa-modal-dialog">
@@ -2103,6 +2263,31 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                       </select>
                     </div>
                     <div class="form-group mb-3">
+                      <label for="profile_plan_id" class="form-label">Membresia</label>
+                      <select class="form-select" id="profile_plan_id" name="id_plan">
+                        <?php foreach ($planOptions as $planOption): ?>
+                        <option
+                          value="<?php echo (int) ($planOption['id_plan'] ?? 0); ?>"
+                          <?php echo (int) ($profileFormData['id_plan'] ?? $defaultUserPlanId) === (int) ($planOption['id_plan'] ?? 0) ? 'selected' : ''; ?>
+                        >
+                          <?php echo htmlspecialchars((string) ($planOption['nombre'] ?? 'Plan')); ?>
+                          · <?php echo htmlspecialchars(PlanModel::formatPriceLabel($planOption)); ?>
+                        </option>
+                        <?php endforeach; ?>
+                      </select>
+                      <small class="text-muted">Solo aplica a usuarios cliente. Si el rol es admin, se guarda como cuenta interna.</small>
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="profile_country" class="form-label">Pais</label>
+                      <select class="form-select" id="profile_country" name="pais">
+                        <?php foreach ($countryOptions as $countryValue => $countryLabel): ?>
+                        <option value="<?php echo htmlspecialchars((string) $countryValue); ?>" <?php echo ($profileFormData['pais'] ?? $defaultCountry) === $countryValue ? 'selected' : ''; ?>>
+                          <?php echo htmlspecialchars((string) $countryLabel); ?>
+                        </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    <div class="form-group mb-3">
                       <label for="profile_password" class="form-label">Clave</label>
                       <input
                         type="password"
@@ -2168,6 +2353,30 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
                       <select class="form-select" id="edit_profile_role" name="rol">
                         <option value="user" <?php echo ($editProfileFormData['rol'] ?? 'user') === 'user' ? 'selected' : ''; ?>>Usuario</option>
                         <option value="admin" <?php echo ($editProfileFormData['rol'] ?? 'user') === 'admin' ? 'selected' : ''; ?>>Administrador</option>
+                      </select>
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="edit_profile_plan_id" class="form-label">Membresia</label>
+                      <select class="form-select" id="edit_profile_plan_id" name="id_plan">
+                        <?php foreach ($planOptions as $planOption): ?>
+                        <option
+                          value="<?php echo (int) ($planOption['id_plan'] ?? 0); ?>"
+                          <?php echo (int) ($editProfileFormData['id_plan'] ?? $defaultUserPlanId) === (int) ($planOption['id_plan'] ?? 0) ? 'selected' : ''; ?>
+                        >
+                          <?php echo htmlspecialchars((string) ($planOption['nombre'] ?? 'Plan')); ?>
+                          · <?php echo htmlspecialchars(PlanModel::formatPriceLabel($planOption)); ?>
+                        </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    <div class="form-group mb-3">
+                      <label for="edit_profile_country" class="form-label">Pais</label>
+                      <select class="form-select" id="edit_profile_country" name="pais">
+                        <?php foreach ($countryOptions as $countryValue => $countryLabel): ?>
+                        <option value="<?php echo htmlspecialchars((string) $countryValue); ?>" <?php echo ($editProfileFormData['pais'] ?? $defaultCountry) === $countryValue ? 'selected' : ''; ?>>
+                          <?php echo htmlspecialchars((string) $countryLabel); ?>
+                        </option>
+                        <?php endforeach; ?>
                       </select>
                     </div>
                     <div class="form-group mb-3">
@@ -2256,6 +2465,9 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         const commandNoteText = document.getElementById('command_note_text');
         const perfilForm = document.getElementById('perfilForm');
         const editarPerfilForm = document.getElementById('editarPerfilForm');
+        const profileRoleInput = document.getElementById('profile_role');
+        const profilePlanInput = document.getElementById('profile_plan_id');
+        const profileCountryInput = document.getElementById('profile_country');
         const deleteUserForm = document.getElementById('deleteUserForm');
         const nombreInput = document.getElementById('nombre');
         const inicialesInput = document.getElementById('iniciales');
@@ -2267,6 +2479,8 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         const editUserIdInput = document.getElementById('edit_user_id');
         const editProfileUsernameInput = document.getElementById('edit_profile_username');
         const editProfileRoleInput = document.getElementById('edit_profile_role');
+        const editProfilePlanInput = document.getElementById('edit_profile_plan_id');
+        const editProfileCountryInput = document.getElementById('edit_profile_country');
         const editProfilePasswordInput = document.getElementById('edit_profile_password');
         const editProfileConfirmPasswordInput = document.getElementById('edit_profile_confirm_password');
         const editUserButtons = document.querySelectorAll('.btn-edit-user');
@@ -2495,6 +2709,14 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
             editProfileRoleInput.value = userData.rol || 'user';
           }
 
+          if (editProfilePlanInput) {
+            editProfilePlanInput.value = userData.id_plan || String(editProfilePlanInput.value || '');
+          }
+
+          if (editProfileCountryInput) {
+            editProfileCountryInput.value = userData.pais || editProfileCountryInput.value;
+          }
+
           if (editProfilePasswordInput) {
             editProfilePasswordInput.value = '';
           }
@@ -2502,6 +2724,18 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
           if (editProfileConfirmPasswordInput) {
             editProfileConfirmPasswordInput.value = '';
           }
+
+          syncPlanFieldState(editProfileRoleInput, editProfilePlanInput);
+        }
+
+        function syncPlanFieldState(roleInput, planInput) {
+          if (!roleInput || !planInput) {
+            return;
+          }
+
+          const isAdminRole = roleInput.value === 'admin';
+          planInput.disabled = isAdminRole;
+          planInput.classList.toggle('bg-light', isAdminRole);
         }
 
         function validatePasswordForm(passwordInput, confirmInput, allowEmpty) {
@@ -2626,6 +2860,12 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
           });
         }
 
+        if (profileRoleInput) {
+          profileRoleInput.addEventListener('change', function () {
+            syncPlanFieldState(profileRoleInput, profilePlanInput);
+          });
+        }
+
         if (editarPerfilForm) {
           editarPerfilForm.addEventListener('submit', function (event) {
             const passwordError = validatePasswordForm(editProfilePasswordInput, editProfileConfirmPasswordInput, true);
@@ -2643,12 +2883,20 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
           });
         }
 
+        if (editProfileRoleInput) {
+          editProfileRoleInput.addEventListener('change', function () {
+            syncPlanFieldState(editProfileRoleInput, editProfilePlanInput);
+          });
+        }
+
         editUserButtons.forEach(function (button) {
           button.addEventListener('click', function () {
             fillEditUserForm({
               id: button.dataset.userId || '',
               username: button.dataset.userUsername || '',
-              rol: button.dataset.userRole || 'user'
+              rol: button.dataset.userRole || 'user',
+              pais: button.dataset.userCountry || '',
+              id_plan: button.dataset.userPlanId || ''
             });
 
             if (editarPerfilModal) {
@@ -2741,6 +2989,8 @@ $saludoPersona = !empty($data['empresa_activa']['nombre'])
         }
 
         syncPreview();
+        syncPlanFieldState(profileRoleInput, profilePlanInput);
+        syncPlanFieldState(editProfileRoleInput, editProfilePlanInput);
         showFlashAlert(flash);
       });
     </script>

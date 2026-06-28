@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../models/EmpresaModel.php';
 require_once __DIR__ . '/../services/BitacoraService.php';
 require_once __DIR__ . '/../services/DatabaseBackupService.php';
+require_once __DIR__ . '/../services/PageVisitService.php';
 
 requireLogin();
 requireAdmin();
@@ -15,6 +16,7 @@ $esAdmin   = true;
 
 $idEmpresaActiva = getActiveEmpresaId();
 $empresaActivaNavbar = $idEmpresaActiva ? EmpresaModel::getById($pdo, $idEmpresaActiva, $idUsuario) : null;
+PageVisitService::track($pdo, $session, 'backups_admin', 'Backups');
 
 $registrarBitacora = static function (
     string $accion,
@@ -131,7 +133,7 @@ $lastSizeText = $latestBackup['size_label'] ?? '-';
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Backups - Saas Contabilidad</title>
+    <title>Backups - Zentra</title>
     <link rel="stylesheet" href="../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../assets/vendors/css/vendor.bundle.base.css">

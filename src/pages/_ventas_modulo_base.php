@@ -9,6 +9,7 @@ require_once __DIR__ . '/../services/DteDataService.php';
 require_once __DIR__ . '/../services/VentasLibroService.php';
 
 requireLogin();
+requireUser();
 
 $tipoLibro = trim((string) ($tipoLibroPagina ?? ''));
 $modulo    = getLibroModule($tipoLibro);
@@ -245,7 +246,7 @@ unset($_SESSION[$importSessionKey]);
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title><?php echo htmlspecialchars((string) $modulo['nombre']); ?> - Saas Contabilidad</title>
+    <title><?php echo htmlspecialchars((string) $modulo['nombre']); ?> - Zentra</title>
     <link rel="stylesheet" href="../assets/vendors/feather/feather.css">
     <link rel="stylesheet" href="../assets/vendors/ti-icons/css/themify-icons.css">
     <link rel="stylesheet" href="../assets/vendors/css/vendor.bundle.base.css">

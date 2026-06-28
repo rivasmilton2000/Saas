@@ -220,6 +220,7 @@ if ($removePhoto && $fotoActual !== '') {
 }
 
 $_SESSION['username'] = $username;
+$_SESSION['nombre_completo'] = $nombreCompleto !== '' ? $nombreCompleto : null;
 
 $detalle = [];
 if ($nombreCompleto !== trim((string) ($usuario['nombre_completo'] ?? ''))) {
