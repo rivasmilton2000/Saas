@@ -47,11 +47,14 @@ function sessionData(): array {
     return [
         'id_usuario' => $_SESSION['id_usuario'] ?? null,
         'username'   => $_SESSION['username'] ?? null,
+        'email'   => $_SESSION['email'] ?? null,
         'rol'        => $_SESSION['rol'] ?? null,
         'nombre_completo' => $_SESSION['nombre_completo'] ?? null,
         'pais' => $_SESSION['pais'] ?? null,
         'id_plan' => $_SESSION['id_plan'] ?? null,
         'plan_nombre' => $_SESSION['plan_nombre'] ?? null,
+        'plan_slug' => $_SESSION['plan_slug'] ?? null,
+        'suscripcion_estado' => $_SESSION['suscripcion_estado'] ?? null,
     ];
 }
 

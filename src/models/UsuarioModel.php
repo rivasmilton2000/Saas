@@ -19,15 +19,32 @@ class UsuarioModel
             "ALTER TABLE usuarios
                 ADD COLUMN IF NOT EXISTS nombre_completo VARCHAR(150) NULL,
                 ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(255) NULL,
+                ADD COLUMN IF NOT EXISTS email VARCHAR(160) NULL,
                 ADD COLUMN IF NOT EXISTS pais VARCHAR(80) NULL,
                 ADD COLUMN IF NOT EXISTS id_plan INTEGER NULL,
+                ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(120) NULL,
+                ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(120) NULL,
+                ADD COLUMN IF NOT EXISTS suscripcion_estado VARCHAR(40) NULL,
+                ADD COLUMN IF NOT EXISTS suscripcion_renueva_at TIMESTAMP NULL,
                 ADD COLUMN IF NOT EXISTS ultimo_login_at TIMESTAMP NULL,
                 ADD COLUMN IF NOT EXISTS ultima_actividad_at TIMESTAMP NULL"
         );
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_id_plan ON usuarios (id_plan)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_pais ON usuarios (pais)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_suscripcion_estado ON usuarios (suscripcion_estado)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_stripe_customer ON usuarios (stripe_customer_id)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_ultimo_login ON usuarios (ultimo_login_at)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_ultima_actividad ON usuarios (ultima_actividad_at)");
+        $pdo->exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_email_unique
+             ON usuarios ((LOWER(email)))
+             WHERE email IS NOT NULL AND TRIM(email) <> ''"
+        );
+        $pdo->exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_stripe_subscription_unique
+             ON usuarios (stripe_subscription_id)
+             WHERE stripe_subscription_id IS NOT NULL"
+        );
         $pdo->exec(
             "DO $$
             BEGIN
@@ -50,6 +67,11 @@ class UsuarioModel
              SET pais = 'El Salvador'
              WHERE pais IS NULL OR TRIM(pais) = ''"
         );
+        $pdo->exec(
+            "UPDATE usuarios
+             SET email = LOWER(TRIM(email))
+             WHERE email IS NOT NULL AND TRIM(email) <> ''"
+        );
 
         $defaultPlan = PlanModel::getBySlug($pdo, 'free');
         if ($defaultPlan !== null) {
@@ -61,6 +83,25 @@ class UsuarioModel
             );
             $stmt->execute([(int) ($defaultPlan['id_plan'] ?? 0)]);
         }
+
+        $pdo->exec(
+            "UPDATE usuarios
+             SET suscripcion_estado = CASE
+                 WHEN rol = 'admin' THEN 'admin'
+                 ELSE 'free'
+             END
+             WHERE suscripcion_estado IS NULL OR TRIM(suscripcion_estado) = ''"
+        );
+        $pdo->exec(
+            "UPDATE usuarios u
+             SET suscripcion_estado = 'active'
+             FROM planes p
+             WHERE u.id_plan = p.id_plan
+               AND u.rol = 'user'
+               AND p.precio IS NOT NULL
+               AND p.precio > 0
+               AND (u.suscripcion_estado IS NULL OR u.suscripcion_estado = 'free')"
+        );
 
         self::$schemaChecked = true;
     }
@@ -92,6 +133,46 @@ class UsuarioModel
              LIMIT 1"
         );
         $stmt->execute([trim($username)]);
+
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $usuario ?: null;
+    }
+
+    public static function getByEmail(PDO $pdo, string $email): ?array
+    {
+        self::ensureSchema($pdo);
+
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            self::baseSelectSql() . "
+             WHERE LOWER(COALESCE(u.email, '')) = LOWER(?)
+             LIMIT 1"
+        );
+        $stmt->execute([$email]);
+
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $usuario ?: null;
+    }
+
+    public static function getByStripeSubscriptionId(PDO $pdo, string $subscriptionId): ?array
+    {
+        self::ensureSchema($pdo);
+
+        $subscriptionId = trim($subscriptionId);
+        if ($subscriptionId === '') {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            self::baseSelectSql(false) . "
+             WHERE u.stripe_subscription_id = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$subscriptionId]);
 
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
         return $usuario ?: null;
@@ -344,30 +425,43 @@ class UsuarioModel
     {
         self::ensureSchema($pdo);
 
+        $idPlan = self::nullablePlanId($data['id_plan'] ?? null);
+        $email = self::normalizeEmail($data['email'] ?? null);
+
         $stmt = $pdo->prepare(
             "INSERT INTO usuarios (
                 username,
                 nombre_completo,
                 foto_perfil,
+                email,
                 password,
                 rol,
                 estado,
                 pais,
                 id_plan,
+                stripe_customer_id,
+                stripe_subscription_id,
+                suscripcion_estado,
+                suscripcion_renueva_at,
                 ultimo_login_at,
                 ultima_actividad_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id"
         );
         $stmt->execute([
             trim((string) $data['username']),
             self::nullableText($data['nombre_completo'] ?? null),
             self::nullableText($data['foto_perfil'] ?? null),
+            $email,
             (string) $data['password'],
             self::normalizeRole($data['rol'] ?? 'user'),
             dbBoolParam($data['estado'] ?? true),
             self::normalizeCountry($data['pais'] ?? 'El Salvador'),
-            self::nullablePlanId($data['id_plan'] ?? null),
+            $idPlan,
+            self::nullableText($data['stripe_customer_id'] ?? null),
+            self::nullableText($data['stripe_subscription_id'] ?? null),
+            self::normalizeSubscriptionState($pdo, $data['suscripcion_estado'] ?? null, $data['rol'] ?? 'user', $idPlan),
+            self::normalizeDateTime($data['suscripcion_renueva_at'] ?? null),
             null,
             null,
         ]);
@@ -379,22 +473,33 @@ class UsuarioModel
     {
         self::ensureSchema($pdo);
         $usuarioActual = self::getById($pdo, $idUsuario, false);
+        $idPlan = self::nullablePlanId($data['id_plan'] ?? ($usuarioActual['id_plan'] ?? null));
+        $rol = self::normalizeRole($data['rol'] ?? ($usuarioActual['rol'] ?? 'user'));
 
         $fields = [
             'username = ?',
             'nombre_completo = ?',
             'foto_perfil = ?',
+            'email = ?',
             'rol = ?',
             'pais = ?',
             'id_plan = ?',
+            'suscripcion_estado = ?',
         ];
         $params = [
             trim((string) $data['username']),
             self::nullableText($data['nombre_completo'] ?? ($usuarioActual['nombre_completo'] ?? null)),
             self::nullableText($data['foto_perfil'] ?? ($usuarioActual['foto_perfil'] ?? null)),
-            self::normalizeRole($data['rol'] ?? 'user'),
+            self::normalizeEmail($data['email'] ?? ($usuarioActual['email'] ?? null)),
+            $rol,
             self::normalizeCountry($data['pais'] ?? ($usuarioActual['pais'] ?? 'El Salvador')),
-            self::nullablePlanId($data['id_plan'] ?? ($usuarioActual['id_plan'] ?? null)),
+            $idPlan,
+            self::normalizeSubscriptionState(
+                $pdo,
+                $data['suscripcion_estado'] ?? ($usuarioActual['suscripcion_estado'] ?? null),
+                $rol,
+                $idPlan
+            ),
         ];
 
         if (isset($data['password']) && (string) $data['password'] !== '') {
@@ -408,6 +513,71 @@ class UsuarioModel
             "UPDATE usuarios
              SET " . implode(', ', $fields) . "
              WHERE id = ? AND estado = TRUE"
+        );
+
+        return $stmt->execute($params);
+    }
+
+    public static function updateSubscriptionData(PDO $pdo, int $idUsuario, array $data): bool
+    {
+        self::ensureSchema($pdo);
+
+        if ($idUsuario <= 0) {
+            return false;
+        }
+
+        $usuarioActual = self::getById($pdo, $idUsuario, false);
+        if ($usuarioActual === null) {
+            return false;
+        }
+
+        $fields = [];
+        $params = [];
+
+        if (array_key_exists('email', $data)) {
+            $fields[] = 'email = ?';
+            $params[] = self::normalizeEmail($data['email']);
+        }
+
+        if (array_key_exists('id_plan', $data)) {
+            $fields[] = 'id_plan = ?';
+            $params[] = self::nullablePlanId($data['id_plan']);
+        }
+
+        if (array_key_exists('stripe_customer_id', $data)) {
+            $fields[] = 'stripe_customer_id = ?';
+            $params[] = self::nullableText($data['stripe_customer_id']);
+        }
+
+        if (array_key_exists('stripe_subscription_id', $data)) {
+            $fields[] = 'stripe_subscription_id = ?';
+            $params[] = self::nullableText($data['stripe_subscription_id']);
+        }
+
+        if (array_key_exists('suscripcion_estado', $data)) {
+            $rol = (string) ($usuarioActual['rol'] ?? 'user');
+            $idPlan = array_key_exists('id_plan', $data)
+                ? self::nullablePlanId($data['id_plan'])
+                : self::nullablePlanId($usuarioActual['id_plan'] ?? null);
+            $fields[] = 'suscripcion_estado = ?';
+            $params[] = self::normalizeSubscriptionState($pdo, $data['suscripcion_estado'], $rol, $idPlan);
+        }
+
+        if (array_key_exists('suscripcion_renueva_at', $data)) {
+            $fields[] = 'suscripcion_renueva_at = ?';
+            $params[] = self::normalizeDateTime($data['suscripcion_renueva_at']);
+        }
+
+        if ($fields === []) {
+            return false;
+        }
+
+        $params[] = $idUsuario;
+
+        $stmt = $pdo->prepare(
+            "UPDATE usuarios
+             SET " . implode(', ', $fields) . "
+             WHERE id = ?"
         );
 
         return $stmt->execute($params);
@@ -505,7 +675,7 @@ class UsuarioModel
         $stmt->execute([$idUsuario]);
     }
 
-    private static function usernameExists(PDO $pdo, string $username, ?int $excludeId = null): bool
+    public static function usernameExists(PDO $pdo, string $username, ?int $excludeId = null): bool
     {
         self::ensureSchema($pdo);
 
@@ -513,6 +683,33 @@ class UsuarioModel
                 FROM usuarios
                 WHERE LOWER(username) = LOWER(?) AND estado = TRUE";
         $params = [trim($username)];
+
+        if ($excludeId !== null && $excludeId > 0) {
+            $sql .= " AND id <> ?";
+            $params[] = $excludeId;
+        }
+
+        $sql .= " LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    }
+
+    public static function emailExists(PDO $pdo, string $email, ?int $excludeId = null): bool
+    {
+        self::ensureSchema($pdo);
+
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return false;
+        }
+
+        $sql = "SELECT id
+                FROM usuarios
+                WHERE LOWER(COALESCE(email, '')) = LOWER(?) AND estado = TRUE";
+        $params = [$email];
 
         if ($excludeId !== null && $excludeId > 0) {
             $sql .= " AND id <> ?";
@@ -569,6 +766,12 @@ class UsuarioModel
         return $value !== '' ? $value : null;
     }
 
+    private static function normalizeEmail($value): ?string
+    {
+        $value = strtolower(trim((string) $value));
+        return $value !== '' ? $value : null;
+    }
+
     private static function nullablePlanId($value): ?int
     {
         $value = (int) $value;
@@ -578,6 +781,35 @@ class UsuarioModel
     private static function normalizeCountry($pais): string
     {
         return normalizeCountryValue($pais, 'El Salvador');
+    }
+
+    private static function normalizeSubscriptionState(PDO $pdo, $value, $rol, ?int $idPlan): ?string
+    {
+        $rol = self::normalizeRole($rol, 'user');
+        $value = strtolower(trim((string) $value));
+
+        if ($rol === 'admin') {
+            return 'admin';
+        }
+
+        if ($value !== '') {
+            return $value;
+        }
+
+        if (($idPlan ?? 0) > 0) {
+            $plan = PlanModel::getById($pdo, (int) $idPlan);
+            if ($plan !== null && ($plan['precio'] ?? null) !== null && (float) ($plan['precio'] ?? 0) > 0) {
+                return 'active';
+            }
+        }
+
+        return 'free';
+    }
+
+    private static function normalizeDateTime($value): ?string
+    {
+        $value = trim((string) $value);
+        return $value !== '' ? $value : null;
     }
 
     private static function resolvePlanInput(PDO $pdo, $idPlan, string $rol): array
@@ -630,6 +862,7 @@ class UsuarioModel
                     u.username,
                     u.nombre_completo,
                     u.foto_perfil,
+                    u.email,
                     " . $passwordColumn . "
                     u.rol,
                     CASE WHEN u.estado THEN 1 ELSE 0 END AS estado,
@@ -640,6 +873,10 @@ class UsuarioModel
                     p.nombre AS plan_nombre,
                     p.precio AS plan_precio,
                     p.periodo AS plan_periodo,
+                    u.stripe_customer_id,
+                    u.stripe_subscription_id,
+                    u.suscripcion_estado,
+                    u.suscripcion_renueva_at,
                     u.ultimo_login_at,
                     u.ultima_actividad_at
                 FROM usuarios u
