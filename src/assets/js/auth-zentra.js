@@ -1,31 +1,18 @@
 document.addEventListener('DOMContentLoaded', function () {
-  const googleButtons = document.querySelectorAll('[data-auth-google]');
-  googleButtons.forEach(function (button) {
-    button.addEventListener('click', function () {
-      const scope = button.getAttribute('data-auth-google') || 'default';
-      const note = document.querySelector('[data-google-note="' + scope + '"]');
-      if (note) {
-        note.classList.toggle('is-visible');
-      }
-    });
-  });
-
   const planRadios = Array.from(document.querySelectorAll('input[data-plan-radio]'));
+  if (!planRadios.length) {
+    return;
+  }
+
   const submitButton = document.querySelector('[data-plan-submit]');
-  const submitLabel = document.querySelector('[data-plan-submit-label]');
-  const submitNote = document.querySelector('[data-plan-note]');
   const summaryName = document.querySelector('[data-plan-summary-name]');
   const summaryPrice = document.querySelector('[data-plan-summary-price]');
-  const summaryPeriod = document.querySelector('[data-plan-summary-period]');
   const summaryDescription = document.querySelector('[data-plan-summary-description]');
   const summaryCompanies = document.querySelector('[data-plan-summary-companies]');
   const summaryUsers = document.querySelector('[data-plan-summary-users]');
   const summaryDocs = document.querySelector('[data-plan-summary-docs]');
-  const summaryBenefits = document.querySelector('[data-plan-benefits-list]');
-
-  if (!planRadios.length) {
-    return;
-  }
+  const summaryBenefits = document.querySelector('[data-plan-summary-benefits]');
+  const summaryNote = document.querySelector('[data-plan-note]');
 
   const syncSelectionState = function () {
     planRadios.forEach(function (radio) {
@@ -38,27 +25,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   };
 
-  const renderBenefits = function (encodedBenefits) {
-    if (!summaryBenefits) {
-      return;
-    }
-
-    summaryBenefits.innerHTML = '';
-
-    let benefits = [];
-    try {
-      benefits = JSON.parse(encodedBenefits || '[]');
-    } catch (error) {
-      benefits = [];
-    }
-
-    benefits.forEach(function (item) {
-      const li = document.createElement('li');
-      li.textContent = item;
-      summaryBenefits.appendChild(li);
-    });
-  };
-
   const updateSummary = function (radio) {
     const card = radio.closest('[data-plan-card]');
     if (!card) {
@@ -66,68 +32,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const checkoutMode = card.getAttribute('data-plan-checkout') || 'free';
-    const planName = card.getAttribute('data-plan-name') || 'Plan';
-    const planPrice = card.getAttribute('data-plan-price') || '$0.00';
-    const planPeriod = card.getAttribute('data-plan-period') || '';
-    const planDescription = card.getAttribute('data-plan-description') || '';
-    const companies = card.getAttribute('data-plan-companies') || 'Escalable';
-    const users = card.getAttribute('data-plan-users') || 'Escalable';
-    const docs = card.getAttribute('data-plan-docs') || 'Escalable';
-    const benefits = card.getAttribute('data-plan-benefits') || '[]';
 
     if (summaryName) {
-      summaryName.textContent = planName;
+      summaryName.textContent = card.getAttribute('data-plan-name') || 'Plan';
     }
 
     if (summaryPrice) {
-      summaryPrice.textContent = planPrice;
-    }
-
-    if (summaryPeriod) {
-      summaryPeriod.textContent = planPeriod;
+      summaryPrice.textContent = card.getAttribute('data-plan-price-label') || '$0.00';
     }
 
     if (summaryDescription) {
-      summaryDescription.textContent = planDescription;
+      summaryDescription.textContent = card.getAttribute('data-plan-description') || '';
     }
 
     if (summaryCompanies) {
-      summaryCompanies.textContent = companies;
+      summaryCompanies.textContent = card.getAttribute('data-plan-companies') || 'Escalable';
     }
 
     if (summaryUsers) {
-      summaryUsers.textContent = users;
+      summaryUsers.textContent = card.getAttribute('data-plan-users') || 'Escalable';
     }
 
     if (summaryDocs) {
-      summaryDocs.textContent = docs;
+      summaryDocs.textContent = card.getAttribute('data-plan-docs') || 'Sin tope fijo';
     }
 
-    renderBenefits(benefits);
-
-    if (!submitButton || !submitLabel || !submitNote) {
-      return;
+    if (summaryBenefits) {
+      summaryBenefits.textContent = card.getAttribute('data-plan-benefits') || '';
     }
 
-    submitButton.disabled = false;
-    submitNote.classList.remove('is-warning');
-
-    if (checkoutMode === 'free') {
-      submitLabel.textContent = 'Crear cuenta gratis';
-      submitNote.textContent = 'La cuenta se crea al instante y luego podras cambiar de plan cuando quieras.';
-      return;
+    if (summaryNote) {
+      summaryNote.textContent = card.getAttribute('data-plan-note') || '';
+      summaryNote.classList.toggle('auth-inline-note--warning', checkoutMode === 'pending');
     }
 
-    if (checkoutMode === 'stripe') {
-      submitLabel.textContent = 'Continuar a Stripe';
-      submitNote.textContent = 'Te llevaremos a Stripe Checkout para cobrar la membresia y activar los beneficios correctos.';
-      return;
+    if (submitButton) {
+      submitButton.disabled = checkoutMode === 'pending';
     }
-
-    submitButton.disabled = true;
-    submitLabel.textContent = 'Stripe pendiente';
-    submitNote.textContent = 'Este plan aun necesita su Price ID de Stripe en el entorno antes de poder cobrarse.';
-    submitNote.classList.add('is-warning');
   };
 
   planRadios.forEach(function (radio) {
@@ -137,18 +78,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  let selectedRadio = planRadios.find(function (radio) {
+  const selectedRadio = planRadios.find(function (radio) {
     return radio.checked;
-  });
-
-  if (!selectedRadio) {
-    selectedRadio = planRadios[0];
-    if (selectedRadio) {
-      selectedRadio.checked = true;
-    }
-  }
+  }) || planRadios[0];
 
   if (selectedRadio) {
+    selectedRadio.checked = true;
     syncSelectionState();
     updateSummary(selectedRadio);
   }
