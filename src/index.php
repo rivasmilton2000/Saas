@@ -5,15 +5,42 @@ require_once __DIR__ . '/config/modulos.php';
 require_once __DIR__ . '/controllers/DashboardController.php';
 require_once __DIR__ . '/models/EmpresaModel.php';
 require_once __DIR__ . '/models/UsuarioModel.php';
+require_once __DIR__ . '/services/AuthSessionService.php';
 require_once __DIR__ . '/services/BitacoraService.php';
 require_once __DIR__ . '/services/CentroMandoService.php';
 require_once __DIR__ . '/services/DatabaseBackupService.php';
 require_once __DIR__ . '/services/PageVisitService.php';
+require_once __DIR__ . '/services/StripeBillingService.php';
 
 requireLogin();
 
 $session = sessionData();
 $idUsuario = (int) $session['id_usuario'];
+$usuarioActual = UsuarioModel::getById($pdo, $idUsuario, false);
+
+if ($usuarioActual !== null && AuthSessionService::needsPlanSelection($usuarioActual)) {
+    AuthSessionService::refreshFromDatabase($pdo, $idUsuario);
+    header('Location: /Saas/src/pages/samples/select-plan.php');
+    exit;
+}
+
+if (
+    $usuarioActual !== null
+    && (string) ($usuarioActual['rol'] ?? 'user') === 'user'
+    && ($usuarioActual['plan_precio'] ?? null) !== null
+    && (float) ($usuarioActual['plan_precio'] ?? 0) > 0
+    && !StripeBillingService::subscriptionStatusAllowsAccess($usuarioActual['suscripcion_estado'] ?? null)
+) {
+    $checkoutSessionId = trim((string) ($usuarioActual['stripe_checkout_session_id'] ?? ''));
+    if ($checkoutSessionId !== '') {
+        header('Location: /Saas/src/payments/payment_success.php?session_id=' . rawurlencode($checkoutSessionId));
+        exit;
+    }
+
+    header('Location: /Saas/src/pages/samples/select-plan.php');
+    exit;
+}
+
 $esAdmin = isAdmin();
 $zonaHorariaLocal = new DateTimeZone('America/El_Salvador');
 $ahoraLocal = new DateTimeImmutable('now', $zonaHorariaLocal);

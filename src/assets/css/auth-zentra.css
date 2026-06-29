@@ -21,7 +21,7 @@ body.zentra-auth-body {
 }
 
 .auth-shell--register {
-  max-width: 620px;
+  max-width: 920px;
 }
 
 .auth-shell--admin {
@@ -111,6 +111,17 @@ body.zentra-auth-body {
   gap: 0.55rem;
 }
 
+.auth-google-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.auth-google-slot > div,
+.auth-google-slot iframe {
+  max-width: 100%;
+}
+
 .auth-social-btn,
 .auth-primary-btn {
   display: inline-flex;
@@ -149,6 +160,14 @@ body.zentra-auth-body {
   color: #94a3b8;
   font-size: 0.79rem;
   line-height: 1.5;
+  text-align: center;
+}
+
+.auth-feedback-note {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.8rem;
+  line-height: 1.55;
   text-align: center;
 }
 
@@ -325,9 +344,9 @@ body.zentra-auth-body {
 
 .auth-mode-note,
 .auth-plan-section {
-  padding: 1rem;
+  padding: 1.1rem;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 18px;
   background: #fbfdff;
 }
 
@@ -371,35 +390,53 @@ body.zentra-auth-body {
   gap: 0.9rem;
 }
 
+.auth-plan-eyebrow {
+  margin: 0 0 0.35rem;
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-plan-status-note {
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  text-align: right;
+}
+
 .auth-plan-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
 }
 
 .auth-plan-option {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 0.9rem;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 100%;
+  padding: 2.7rem 1rem 1rem;
   border: 1px solid #dbe3ef;
-  border-radius: 14px;
+  border-radius: 20px;
   background: #ffffff;
   cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, transform 0.16s ease;
 }
 
 .auth-plan-option:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   border-color: #93c5fd;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.07);
 }
 
 .auth-plan-option.is-selected {
   border-color: #2563eb;
-  background: #eff6ff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  background: #f8fbff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08), 0 14px 28px rgba(37, 99, 235, 0.07);
 }
 
 .auth-plan-option input[type="radio"] {
@@ -408,33 +445,113 @@ body.zentra-auth-body {
   pointer-events: none;
 }
 
+.auth-plan-option-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.auth-plan-option-head {
+  display: grid;
+  gap: 0.65rem;
+}
+
 .auth-plan-option-main {
   min-width: 0;
   display: grid;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 
 .auth-plan-option-name {
   color: #0f172a;
-  font-size: 0.9rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 
 .auth-plan-option-caption {
   color: #64748b;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  display: -webkit-box;
+  min-height: 2.55rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .auth-plan-option-price {
   color: #1d4ed8;
+  font-size: 1.34rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.auth-plan-option-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-plan-option-list li {
+  position: relative;
+  padding-left: 1rem;
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.auth-plan-option-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.52rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.auth-plan-card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  margin-top: auto;
+  padding: 0 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  color: #0f172a;
   font-size: 0.82rem;
   font-weight: 700;
-  white-space: nowrap;
+}
+
+.auth-plan-option.is-selected .auth-plan-card-action {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
 }
 
 .auth-plan-summary {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.3rem;
+  padding: 0.15rem 0 0;
 }
 
 .auth-plan-summary-title {
@@ -449,33 +566,67 @@ body.zentra-auth-body {
   color: #0f172a;
   font-size: 0.92rem;
   font-weight: 700;
-}
-
-.auth-plan-summary-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  align-items: center;
 }
 
-.auth-plan-summary-meta span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 0 0.7rem;
-  border-radius: 999px;
-  background: #eef4ff;
-  color: #1d4ed8;
-  font-size: 0.74rem;
-  font-weight: 600;
+.auth-plan-summary-text {
+  color: #475569;
 }
 
 .auth-inline-note {
   color: #64748b;
   font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .auth-inline-note--warning {
   color: #b45309;
+}
+
+.auth-plan-enterprise {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #0f172a;
+  text-decoration: none;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.auth-plan-enterprise:hover {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.auth-plan-enterprise-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.auth-plan-enterprise-copy strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.auth-plan-enterprise-copy span {
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.auth-plan-enterprise-link {
+  color: #1d4ed8;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .auth-submit-wrap {
@@ -503,8 +654,13 @@ body.zentra-auth-body {
   }
 
   .auth-meta-row,
-  .auth-plan-heading {
+  .auth-plan-heading,
+  .auth-plan-enterprise {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .auth-plan-status-note {
+    text-align: left;
   }
 }

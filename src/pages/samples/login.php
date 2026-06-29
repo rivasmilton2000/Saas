@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/app.php';
+require_once __DIR__ . '/../../config/google.php';
 require_once __DIR__ . '/../../controllers/AuthController.php';
 
 requireGuest();
@@ -23,6 +24,10 @@ $alertClass = match ((string) ($flash['type'] ?? 'info')) {
 
 $publicHomeUrl = saasPublicUrl('index.php');
 $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
+$googleReady = googleIsConfigured();
+$googleClientId = $googleReady ? googleConfig()['client_id'] : '';
+$googleNonce = $googleReady ? googleAuthNonce(true) : '';
+$googleCallbackUrl = '/Saas/src/auth/google_callback.php';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -48,7 +53,7 @@ $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
           </a>
 
           <header class="auth-header">
-            <h1 class="auth-title">Inicia sesión</h1>
+            <h1 class="auth-title">Inicia sesion</h1>
             <p class="auth-subtitle">Accede a tu cuenta para continuar.</p>
           </header>
 
@@ -58,17 +63,22 @@ $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
           </div>
           <?php endif; ?>
 
-          <div class="auth-social-stack">
-            <button type="button" class="auth-social-btn" disabled aria-disabled="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.5 3.9-5.4 3.9-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.2 14.7 2.2 12 2.2 6.8 2.2 2.6 6.4 2.6 11.6S6.8 21 12 21c6.9 0 9.1-4.8 9.1-7.3 0-.5-.1-.9-.1-1.3H12Z"></path>
-                <path fill="#34A853" d="M3.6 7.1l3.2 2.4c.9-1.8 2.8-3.1 5.2-3.1 1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.2 14.7 2.2 12 2.2 8.3 2.2 5 4.3 3.6 7.1Z"></path>
-                <path fill="#FBBC05" d="M12 21c2.6 0 4.8-.9 6.4-2.5l-3.1-2.5c-.8.6-1.9 1-3.3 1-2.5 0-4.5-1.7-5.3-4l-3.3 2.5C4.8 18.6 8.1 21 12 21Z"></path>
-                <path fill="#4285F4" d="M21.1 13.7c0-.5-.1-.9-.1-1.3H12v3.9h5.4c-.3 1.2-1 2.2-2.1 3l3.1 2.5c1.8-1.7 2.7-4.1 2.7-7.1Z"></path>
-              </svg>
-              Continuar con Google
-            </button>
-            <p class="auth-social-note">Disponible pronto.</p>
+          <div
+            class="auth-social-stack"
+            data-google-auth-root
+            data-google-context="login"
+            data-google-client-id="<?php echo htmlspecialchars($googleClientId); ?>"
+            data-google-callback="<?php echo htmlspecialchars($googleCallbackUrl); ?>"
+            data-google-nonce="<?php echo htmlspecialchars($googleNonce); ?>"
+          >
+            <?php if ($googleReady): ?>
+            <div class="auth-google-slot" data-google-slot></div>
+            <p class="auth-social-note">Accede con tu cuenta verificada de Google.</p>
+            <?php else: ?>
+            <button type="button" class="auth-social-btn" disabled aria-disabled="true">Continuar con Google</button>
+            <p class="auth-social-note">Configura GOOGLE_CLIENT_ID para habilitar este acceso.</p>
+            <?php endif; ?>
+            <p class="auth-feedback-note" data-auth-feedback hidden></p>
           </div>
 
           <div class="auth-divider"><span>o entra con tu cuenta</span></div>
@@ -89,13 +99,13 @@ $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
             </div>
 
             <div class="auth-field">
-              <label class="auth-sr-only" for="loginPassword">Contraseña</label>
+              <label class="auth-sr-only" for="loginPassword">Contrasena</label>
               <input
                 type="password"
                 name="password"
                 id="loginPassword"
                 class="auth-input"
-                placeholder="Contraseña"
+                placeholder="Contrasena"
                 autocomplete="current-password"
                 required
               >
@@ -106,14 +116,14 @@ $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
                 <input type="checkbox" id="rememberMe" name="remember_me" value="1">
                 <span>Recordarme</span>
               </label>
-              <a href="<?php echo htmlspecialchars($forgotPasswordUrl); ?>" class="auth-link">Olvidé mi contraseña</a>
+              <a href="<?php echo htmlspecialchars($forgotPasswordUrl); ?>" class="auth-link">Olvide mi contrasena</a>
             </div>
 
             <button type="submit" class="auth-primary-btn">Ingresar</button>
           </form>
 
           <p class="auth-link-line">
-            ¿No tienes cuenta? <a href="register.php">Crear cuenta</a>
+            No tienes cuenta? <a href="register.php">Crear cuenta</a>
           </p>
 
           <div class="auth-center-links">
@@ -129,5 +139,9 @@ $forgotPasswordUrl = saasPublicUrl('contact.php?topic=acceso');
     <script src="../../assets/js/settings.js"></script>
     <script src="../../assets/js/todolist.js"></script>
     <script src="../../assets/js/auth-zentra.js"></script>
+    <?php if ($googleReady): ?>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../../assets/js/auth-google.js"></script>
+    <?php endif; ?>
   </body>
 </html>

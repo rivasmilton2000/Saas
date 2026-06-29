@@ -20,19 +20,29 @@ class UsuarioModel
                 ADD COLUMN IF NOT EXISTS nombre_completo VARCHAR(150) NULL,
                 ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR(255) NULL,
                 ADD COLUMN IF NOT EXISTS email VARCHAR(160) NULL,
+                ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(30) NULL,
+                ADD COLUMN IF NOT EXISTS google_id VARCHAR(191) NULL,
+                ADD COLUMN IF NOT EXISTS email_verificado_at TIMESTAMP NULL,
                 ADD COLUMN IF NOT EXISTS pais VARCHAR(80) NULL,
                 ADD COLUMN IF NOT EXISTS id_plan INTEGER NULL,
+                ADD COLUMN IF NOT EXISTS stripe_checkout_session_id VARCHAR(120) NULL,
                 ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(120) NULL,
                 ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(120) NULL,
+                ADD COLUMN IF NOT EXISTS stripe_invoice_id VARCHAR(120) NULL,
+                ADD COLUMN IF NOT EXISTS stripe_invoice_url TEXT NULL,
+                ADD COLUMN IF NOT EXISTS stripe_invoice_pdf_url TEXT NULL,
                 ADD COLUMN IF NOT EXISTS suscripcion_estado VARCHAR(40) NULL,
                 ADD COLUMN IF NOT EXISTS suscripcion_renueva_at TIMESTAMP NULL,
                 ADD COLUMN IF NOT EXISTS ultimo_login_at TIMESTAMP NULL,
                 ADD COLUMN IF NOT EXISTS ultima_actividad_at TIMESTAMP NULL"
         );
+        $pdo->exec("ALTER TABLE usuarios ALTER COLUMN password DROP NOT NULL");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_id_plan ON usuarios (id_plan)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_pais ON usuarios (pais)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_suscripcion_estado ON usuarios (suscripcion_estado)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_stripe_customer ON usuarios (stripe_customer_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_google_id ON usuarios (google_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_checkout_session ON usuarios (stripe_checkout_session_id)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_ultimo_login ON usuarios (ultimo_login_at)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_usuarios_ultima_actividad ON usuarios (ultima_actividad_at)");
         $pdo->exec(
@@ -44,6 +54,16 @@ class UsuarioModel
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_stripe_subscription_unique
              ON usuarios (stripe_subscription_id)
              WHERE stripe_subscription_id IS NOT NULL"
+        );
+        $pdo->exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_google_id_unique
+             ON usuarios (google_id)
+             WHERE google_id IS NOT NULL"
+        );
+        $pdo->exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_checkout_session_unique
+             ON usuarios (stripe_checkout_session_id)
+             WHERE stripe_checkout_session_id IS NOT NULL"
         );
         $pdo->exec(
             "DO $$
@@ -71,6 +91,14 @@ class UsuarioModel
             "UPDATE usuarios
              SET email = LOWER(TRIM(email))
              WHERE email IS NOT NULL AND TRIM(email) <> ''"
+        );
+        $pdo->exec(
+            "UPDATE usuarios
+             SET auth_provider = CASE
+                 WHEN google_id IS NOT NULL AND TRIM(google_id) <> '' THEN 'google'
+                 ELSE 'local'
+             END
+             WHERE auth_provider IS NULL OR TRIM(auth_provider) = ''"
         );
 
         $defaultPlan = PlanModel::getBySlug($pdo, 'free');
@@ -158,6 +186,26 @@ class UsuarioModel
         return $usuario ?: null;
     }
 
+    public static function getByGoogleId(PDO $pdo, string $googleId): ?array
+    {
+        self::ensureSchema($pdo);
+
+        $googleId = trim($googleId);
+        if ($googleId === '') {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            self::baseSelectSql() . "
+             WHERE u.google_id = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$googleId]);
+
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $usuario ?: null;
+    }
+
     public static function getByStripeSubscriptionId(PDO $pdo, string $subscriptionId): ?array
     {
         self::ensureSchema($pdo);
@@ -173,6 +221,26 @@ class UsuarioModel
              LIMIT 1"
         );
         $stmt->execute([$subscriptionId]);
+
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $usuario ?: null;
+    }
+
+    public static function getByCheckoutSessionId(PDO $pdo, string $sessionId): ?array
+    {
+        self::ensureSchema($pdo);
+
+        $sessionId = trim($sessionId);
+        if ($sessionId === '') {
+            return null;
+        }
+
+        $stmt = $pdo->prepare(
+            self::baseSelectSql(false) . "
+             WHERE u.stripe_checkout_session_id = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$sessionId]);
 
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
         return $usuario ?: null;
@@ -435,17 +503,24 @@ class UsuarioModel
                 foto_perfil,
                 email,
                 password,
+                auth_provider,
+                google_id,
+                email_verificado_at,
                 rol,
                 estado,
                 pais,
                 id_plan,
+                stripe_checkout_session_id,
                 stripe_customer_id,
                 stripe_subscription_id,
+                stripe_invoice_id,
+                stripe_invoice_url,
+                stripe_invoice_pdf_url,
                 suscripcion_estado,
                 suscripcion_renueva_at,
                 ultimo_login_at,
                 ultima_actividad_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id"
         );
         $stmt->execute([
@@ -453,13 +528,20 @@ class UsuarioModel
             self::nullableText($data['nombre_completo'] ?? null),
             self::nullableText($data['foto_perfil'] ?? null),
             $email,
-            (string) $data['password'],
+            self::nullableText($data['password'] ?? null),
+            self::nullableText($data['auth_provider'] ?? null) ?? 'local',
+            self::nullableText($data['google_id'] ?? null),
+            self::normalizeDateTime($data['email_verificado_at'] ?? null),
             self::normalizeRole($data['rol'] ?? 'user'),
             dbBoolParam($data['estado'] ?? true),
             self::normalizeCountry($data['pais'] ?? 'El Salvador'),
             $idPlan,
+            self::nullableText($data['stripe_checkout_session_id'] ?? null),
             self::nullableText($data['stripe_customer_id'] ?? null),
             self::nullableText($data['stripe_subscription_id'] ?? null),
+            self::nullableText($data['stripe_invoice_id'] ?? null),
+            self::nullableText($data['stripe_invoice_url'] ?? null),
+            self::nullableText($data['stripe_invoice_pdf_url'] ?? null),
             self::normalizeSubscriptionState($pdo, $data['suscripcion_estado'] ?? null, $data['rol'] ?? 'user', $idPlan),
             self::normalizeDateTime($data['suscripcion_renueva_at'] ?? null),
             null,
@@ -549,9 +631,29 @@ class UsuarioModel
             $params[] = self::nullableText($data['stripe_customer_id']);
         }
 
+        if (array_key_exists('stripe_checkout_session_id', $data)) {
+            $fields[] = 'stripe_checkout_session_id = ?';
+            $params[] = self::nullableText($data['stripe_checkout_session_id']);
+        }
+
         if (array_key_exists('stripe_subscription_id', $data)) {
             $fields[] = 'stripe_subscription_id = ?';
             $params[] = self::nullableText($data['stripe_subscription_id']);
+        }
+
+        if (array_key_exists('stripe_invoice_id', $data)) {
+            $fields[] = 'stripe_invoice_id = ?';
+            $params[] = self::nullableText($data['stripe_invoice_id']);
+        }
+
+        if (array_key_exists('stripe_invoice_url', $data)) {
+            $fields[] = 'stripe_invoice_url = ?';
+            $params[] = self::nullableText($data['stripe_invoice_url']);
+        }
+
+        if (array_key_exists('stripe_invoice_pdf_url', $data)) {
+            $fields[] = 'stripe_invoice_pdf_url = ?';
+            $params[] = self::nullableText($data['stripe_invoice_pdf_url']);
         }
 
         if (array_key_exists('suscripcion_estado', $data)) {
@@ -566,6 +668,51 @@ class UsuarioModel
         if (array_key_exists('suscripcion_renueva_at', $data)) {
             $fields[] = 'suscripcion_renueva_at = ?';
             $params[] = self::normalizeDateTime($data['suscripcion_renueva_at']);
+        }
+
+        if ($fields === []) {
+            return false;
+        }
+
+        $params[] = $idUsuario;
+
+        $stmt = $pdo->prepare(
+            "UPDATE usuarios
+             SET " . implode(', ', $fields) . "
+             WHERE id = ?"
+        );
+
+        return $stmt->execute($params);
+    }
+
+    public static function updateAuthData(PDO $pdo, int $idUsuario, array $data): bool
+    {
+        self::ensureSchema($pdo);
+
+        if ($idUsuario <= 0) {
+            return false;
+        }
+
+        $fields = [];
+        $params = [];
+
+        foreach ([
+            'email',
+            'foto_perfil',
+            'auth_provider',
+            'google_id',
+        ] as $column) {
+            if (array_key_exists($column, $data)) {
+                $fields[] = $column . ' = ?';
+                $params[] = $column === 'email'
+                    ? self::normalizeEmail($data[$column])
+                    : self::nullableText($data[$column]);
+            }
+        }
+
+        if (array_key_exists('email_verificado_at', $data)) {
+            $fields[] = 'email_verificado_at = ?';
+            $params[] = self::normalizeDateTime($data['email_verificado_at']);
         }
 
         if ($fields === []) {
@@ -864,6 +1011,9 @@ class UsuarioModel
                     u.foto_perfil,
                     u.email,
                     " . $passwordColumn . "
+                    u.auth_provider,
+                    u.google_id,
+                    u.email_verificado_at,
                     u.rol,
                     CASE WHEN u.estado THEN 1 ELSE 0 END AS estado,
                     u.created_at,
@@ -871,10 +1021,18 @@ class UsuarioModel
                     u.id_plan,
                     p.slug AS plan_slug,
                     p.nombre AS plan_nombre,
+                    p.descripcion AS plan_descripcion,
                     p.precio AS plan_precio,
+                    p.moneda AS plan_moneda,
                     p.periodo AS plan_periodo,
+                    p.billing_interval AS plan_billing_interval,
+                    p.personalizado AS plan_personalizado,
+                    u.stripe_checkout_session_id,
                     u.stripe_customer_id,
                     u.stripe_subscription_id,
+                    u.stripe_invoice_id,
+                    u.stripe_invoice_url,
+                    u.stripe_invoice_pdf_url,
                     u.suscripcion_estado,
                     u.suscripcion_renueva_at,
                     u.ultimo_login_at,

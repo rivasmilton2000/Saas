@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../models/UsuarioModel.php';
+require_once __DIR__ . '/../services/AuthSessionService.php';
 require_once __DIR__ . '/../services/BitacoraService.php';
 require_once __DIR__ . '/../services/PublicRegistrationService.php';
 
@@ -33,6 +34,10 @@ class AuthController {
             self::redirect('Usuario inactivo. Contacta al administrador.', $oldInput);
         }
 
+        if (trim((string) ($usuario['password'] ?? '')) === '') {
+            self::redirect('Esta cuenta usa acceso con Google. Continúa desde ese botón.', $oldInput);
+        }
+
         if (!password_verify($password, (string) $usuario['password'])) {
             self::redirect('Clave incorrecta.', $oldInput);
         }
@@ -44,33 +49,8 @@ class AuthController {
             );
         }
 
-        session_regenerate_id(true);
-        $_SESSION['id_usuario'] = $usuario['id'];
-        $_SESSION['username'] = $usuario['username'];
-        $_SESSION['email'] = $usuario['email'] ?? null;
-        $_SESSION['rol'] = $usuario['rol'];
-        $_SESSION['nombre_completo'] = $usuario['nombre_completo'] ?? null;
-        $_SESSION['pais'] = $usuario['pais'] ?? 'El Salvador';
-        $_SESSION['id_plan'] = $usuario['id_plan'] ?? null;
-        $_SESSION['plan_nombre'] = $usuario['plan_nombre'] ?? null;
-        $_SESSION['plan_slug'] = $usuario['plan_slug'] ?? null;
-        $_SESSION['suscripcion_estado'] = $usuario['suscripcion_estado'] ?? null;
-
-        UsuarioModel::markLogin($pdo, (int) $usuario['id']);
-
-        BitacoraService::registrar(
-            $pdo,
-            (int) $usuario['id'],
-            'auth',
-            'login',
-            'Inicio de sesion correcto.',
-            [
-                'username' => (string) $usuario['username'],
-                'rol'      => (string) $usuario['rol'],
-            ]
-        );
-
-        header('Location: /Saas/src/index.php');
+        AuthSessionService::establish($pdo, $usuario, 'login', 'Inicio de sesion correcto.');
+        header('Location: ' . AuthSessionService::redirectPathForUser($usuario));
         exit;
     }
 
@@ -159,11 +139,17 @@ class AuthController {
             exit;
         }
 
-        setFlash(
-            'login',
-            'Tu cuenta fue creada con el plan ' . (string) ($result['plan_nombre'] ?? 'Free') . '. Inicia sesion para continuar.',
-            'success'
-        );
+        $user = !empty($result['user_id'])
+            ? UsuarioModel::getById($pdo, (int) $result['user_id'], false)
+            : null;
+
+        if ($user !== null) {
+            AuthSessionService::establish($pdo, $user, 'register_free', 'Registro correcto con plan Free.');
+            header('Location: ' . AuthSessionService::redirectPathForUser($user));
+            exit;
+        }
+
+        setFlash('login', 'Tu cuenta fue creada correctamente. Inicia sesion para continuar.', 'success');
         header('Location: /Saas/src/pages/samples/login.php');
         exit;
     }

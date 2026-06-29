@@ -4,7 +4,7 @@ require_once __DIR__ . '/env.php';
 if (!function_exists('saasBasePath')) {
     function saasBasePath(): string
     {
-        $configured = trim((string) (getenv('APP_PATH') ?: ''));
+        $configured = trim((string) envValue('APP_PATH', ''));
         if ($configured !== '') {
             return '/' . trim($configured, '/');
         }
@@ -26,7 +26,7 @@ if (!function_exists('saasBasePath')) {
 if (!function_exists('saasBaseUrl')) {
     function saasBaseUrl(): string
     {
-        $configured = trim((string) (getenv('APP_URL') ?: ''));
+        $configured = trim((string) envValue('APP_URL', ''));
         if ($configured !== '') {
             return rtrim($configured, '/');
         }

@@ -20,16 +20,26 @@ class PlanModel
                 precio NUMERIC(10, 2) NULL,
                 moneda VARCHAR(10) NOT NULL DEFAULT 'USD',
                 periodo VARCHAR(20) NOT NULL DEFAULT 'mes',
+                billing_interval VARCHAR(20) NULL,
                 destacado BOOLEAN NOT NULL DEFAULT FALSE,
+                is_free BOOLEAN NOT NULL DEFAULT FALSE,
                 personalizado BOOLEAN NOT NULL DEFAULT FALSE,
                 activo BOOLEAN NOT NULL DEFAULT TRUE,
+                trial_days INTEGER NULL,
+                stripe_price_id VARCHAR(120) NULL,
                 orden INTEGER NOT NULL DEFAULT 0,
                 limite_empresas INTEGER NULL,
                 limite_usuarios INTEGER NULL,
                 limite_documentos INTEGER NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )"
         );
+        $pdo->exec("ALTER TABLE planes ADD COLUMN IF NOT EXISTS billing_interval VARCHAR(20) NULL");
+        $pdo->exec("ALTER TABLE planes ADD COLUMN IF NOT EXISTS is_free BOOLEAN NOT NULL DEFAULT FALSE");
+        $pdo->exec("ALTER TABLE planes ADD COLUMN IF NOT EXISTS trial_days INTEGER NULL");
+        $pdo->exec("ALTER TABLE planes ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(120) NULL");
+        $pdo->exec("ALTER TABLE planes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
         $pdo->exec(
             "CREATE TABLE IF NOT EXISTS planes_caracteristicas (
                 id SERIAL PRIMARY KEY,
@@ -61,9 +71,13 @@ class PlanModel
                 precio,
                 moneda,
                 periodo,
+                billing_interval,
                 destacado,
+                is_free,
                 personalizado,
                 activo,
+                trial_days,
+                stripe_price_id,
                 orden,
                 limite_empresas,
                 limite_usuarios,
@@ -73,7 +87,7 @@ class PlanModel
              ORDER BY orden ASC, id_plan ASC"
         );
 
-        $planes = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $planes = array_map([self::class, 'decoratePlanRow'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
         $stmtFeatures = $pdo->prepare(
             "SELECT caracteristica, incluido
              FROM planes_caracteristicas
@@ -106,10 +120,17 @@ class PlanModel
                 id_plan,
                 slug,
                 nombre,
+                descripcion,
                 precio,
+                moneda,
                 periodo,
+                billing_interval,
                 destacado,
+                is_free,
                 personalizado,
+                activo,
+                trial_days,
+                stripe_price_id,
                 limite_empresas,
                 limite_usuarios,
                 limite_documentos
@@ -118,7 +139,7 @@ class PlanModel
              ORDER BY orden ASC, id_plan ASC"
         );
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map([self::class, 'decoratePlanRow'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
     public static function getById(PDO $pdo, int $idPlan): ?array
@@ -138,9 +159,13 @@ class PlanModel
                 precio,
                 moneda,
                 periodo,
+                billing_interval,
                 destacado,
+                is_free,
                 personalizado,
                 activo,
+                trial_days,
+                stripe_price_id,
                 orden,
                 limite_empresas,
                 limite_usuarios,
@@ -152,7 +177,7 @@ class PlanModel
         $stmt->execute([$idPlan]);
 
         $plan = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $plan ?: null;
+        return $plan ? self::decoratePlanRow($plan) : null;
     }
 
     public static function getBySlug(PDO $pdo, string $slug): ?array
@@ -173,9 +198,13 @@ class PlanModel
                 precio,
                 moneda,
                 periodo,
+                billing_interval,
                 destacado,
+                is_free,
                 personalizado,
                 activo,
+                trial_days,
+                stripe_price_id,
                 orden,
                 limite_empresas,
                 limite_usuarios,
@@ -187,7 +216,7 @@ class PlanModel
         $stmt->execute([$slug]);
 
         $plan = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $plan ?: null;
+        return $plan ? self::decoratePlanRow($plan) : null;
     }
 
     public static function formatPriceLabel(array $plan): string
@@ -195,6 +224,10 @@ class PlanModel
         $precio = $plan['precio'] ?? null;
         if ($precio === null || $precio === '') {
             return 'Personalizado';
+        }
+
+        if ((float) $precio <= 0) {
+            return 'Gratis';
         }
 
         $periodo = trim((string) ($plan['periodo'] ?? 'mes'));
@@ -217,27 +250,34 @@ class PlanModel
                 precio,
                 moneda,
                 periodo,
+                billing_interval,
                 destacado,
+                is_free,
                 personalizado,
                 activo,
+                trial_days,
                 orden,
                 limite_empresas,
                 limite_usuarios,
                 limite_documentos
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (slug) DO UPDATE SET
                 nombre = EXCLUDED.nombre,
                 descripcion = EXCLUDED.descripcion,
                 precio = EXCLUDED.precio,
                 moneda = EXCLUDED.moneda,
                 periodo = EXCLUDED.periodo,
+                billing_interval = EXCLUDED.billing_interval,
                 destacado = EXCLUDED.destacado,
+                is_free = EXCLUDED.is_free,
                 personalizado = EXCLUDED.personalizado,
                 activo = EXCLUDED.activo,
+                trial_days = EXCLUDED.trial_days,
                 orden = EXCLUDED.orden,
                 limite_empresas = EXCLUDED.limite_empresas,
                 limite_usuarios = EXCLUDED.limite_usuarios,
-                limite_documentos = EXCLUDED.limite_documentos
+                limite_documentos = EXCLUDED.limite_documentos,
+                updated_at = CURRENT_TIMESTAMP
             RETURNING id_plan"
         );
         $deleteFeatures = $pdo->prepare("DELETE FROM planes_caracteristicas WHERE id_plan = ?");
@@ -247,26 +287,31 @@ class PlanModel
         );
 
         foreach (getPlanCatalog() as $plan) {
+            $catalogPlan = self::normalizeCatalogPlan($plan);
+
             $insertPlan->execute([
-                (string) ($plan['slug'] ?? ''),
-                (string) ($plan['nombre'] ?? ''),
-                (string) ($plan['descripcion'] ?? ''),
-                $plan['precio'],
-                (string) ($plan['moneda'] ?? 'USD'),
-                (string) ($plan['periodo'] ?? 'mes'),
-                dbBoolParam($plan['destacado'] ?? false),
-                dbBoolParam($plan['personalizado'] ?? false),
-                dbBoolParam($plan['activo'] ?? true),
-                (int) ($plan['orden'] ?? 0),
-                isset($plan['limite_empresas']) ? (int) $plan['limite_empresas'] : null,
-                isset($plan['limite_usuarios']) ? (int) $plan['limite_usuarios'] : null,
-                isset($plan['limite_documentos']) ? (int) $plan['limite_documentos'] : null,
+                (string) ($catalogPlan['slug'] ?? ''),
+                (string) ($catalogPlan['nombre'] ?? ''),
+                (string) ($catalogPlan['descripcion'] ?? ''),
+                $catalogPlan['precio'],
+                (string) ($catalogPlan['moneda'] ?? 'USD'),
+                (string) ($catalogPlan['periodo'] ?? 'mes'),
+                $catalogPlan['billing_interval'],
+                dbBoolParam($catalogPlan['destacado'] ?? false),
+                dbBoolParam($catalogPlan['is_free'] ?? false),
+                dbBoolParam($catalogPlan['personalizado'] ?? false),
+                dbBoolParam($catalogPlan['activo'] ?? true),
+                isset($catalogPlan['trial_days']) ? (int) $catalogPlan['trial_days'] : null,
+                (int) ($catalogPlan['orden'] ?? 0),
+                isset($catalogPlan['limite_empresas']) ? (int) $catalogPlan['limite_empresas'] : null,
+                isset($catalogPlan['limite_usuarios']) ? (int) $catalogPlan['limite_usuarios'] : null,
+                isset($catalogPlan['limite_documentos']) ? (int) $catalogPlan['limite_documentos'] : null,
             ]);
 
             $idPlan = (int) $insertPlan->fetchColumn();
             $deleteFeatures->execute([$idPlan]);
 
-            foreach (($plan['caracteristicas'] ?? []) as $index => $feature) {
+            foreach (($catalogPlan['caracteristicas'] ?? []) as $index => $feature) {
                 $insertFeature->execute([
                     $idPlan,
                     trim((string) ($feature['texto'] ?? '')),
@@ -275,5 +320,63 @@ class PlanModel
                 ]);
             }
         }
+    }
+
+    private static function decoratePlanRow(array $plan): array
+    {
+        $plan['billing_interval'] = self::normalizeIntervalValue($plan['billing_interval'] ?? $plan['periodo'] ?? null);
+        $plan['is_free'] = dbBoolValue($plan['is_free'] ?? false)
+            || (($plan['precio'] ?? null) !== null && (float) ($plan['precio'] ?? 0) <= 0);
+        $plan['is_active'] = dbBoolValue($plan['activo'] ?? true);
+        $plan['is_recommended'] = dbBoolValue($plan['destacado'] ?? false);
+        $plan['trial_days'] = isset($plan['trial_days']) && $plan['trial_days'] !== ''
+            ? (int) $plan['trial_days']
+            : null;
+        $plan['id'] = (int) ($plan['id_plan'] ?? 0);
+        $plan['name'] = (string) ($plan['nombre'] ?? '');
+        $plan['description'] = (string) ($plan['descripcion'] ?? '');
+        $plan['price'] = $plan['precio'] ?? null;
+        $plan['currency'] = (string) ($plan['moneda'] ?? 'USD');
+        $plan['company_limit'] = isset($plan['limite_empresas']) && $plan['limite_empresas'] !== ''
+            ? (int) $plan['limite_empresas']
+            : null;
+        $plan['user_limit'] = isset($plan['limite_usuarios']) && $plan['limite_usuarios'] !== ''
+            ? (int) $plan['limite_usuarios']
+            : null;
+        $plan['document_limit'] = isset($plan['limite_documentos']) && $plan['limite_documentos'] !== ''
+            ? (int) $plan['limite_documentos']
+            : null;
+
+        return $plan;
+    }
+
+    private static function normalizeCatalogPlan(array $plan): array
+    {
+        $price = $plan['precio'] ?? null;
+        $isFree = array_key_exists('is_free', $plan)
+            ? dbBoolValue($plan['is_free'])
+            : ($price !== null && (float) $price <= 0);
+
+        return array_merge($plan, [
+            'billing_interval' => self::normalizeIntervalValue($plan['billing_interval'] ?? $plan['periodo'] ?? null),
+            'is_free' => $isFree,
+            'trial_days' => isset($plan['trial_days']) ? (int) $plan['trial_days'] : null,
+        ]);
+    }
+
+    private static function normalizeIntervalValue($value): ?string
+    {
+        $value = strtolower(trim((string) $value));
+        if ($value === '') {
+            return null;
+        }
+
+        return match ($value) {
+            'day', 'daily', 'dia', 'dias' => 'day',
+            'week', 'weekly', 'semana', 'semanal' => 'week',
+            'month', 'monthly', 'mes', 'mensual' => 'month',
+            'year', 'yearly', 'annual', 'annually', 'ano', 'anual' => 'year',
+            default => null,
+        };
     }
 }

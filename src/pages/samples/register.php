@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/app.php';
 require_once __DIR__ . '/../../config/stripe.php';
+require_once __DIR__ . '/../../config/google.php';
 require_once __DIR__ . '/../../config/countries.php';
 require_once __DIR__ . '/../../controllers/AuthController.php';
 require_once __DIR__ . '/../../models/UsuarioModel.php';
@@ -10,48 +11,21 @@ require_once __DIR__ . '/../../services/PublicRegistrationService.php';
 
 requireGuest();
 
-$registerRedirect = static function (): void {
-    header('Location: register.php');
-    exit;
-};
-
 $checkoutAction = strtolower(trim((string) ($_GET['checkout'] ?? '')));
-if ($checkoutAction !== '') {
-    try {
-        if ($checkoutAction === 'success') {
-            $sessionId = trim((string) ($_GET['session_id'] ?? ''));
-            if ($sessionId === '') {
-                setFlash('register', 'No recibimos una sesión válida de Stripe para confirmar la membresía.', 'danger');
-                $registerRedirect();
-            }
-
-            $result = PublicRegistrationService::finalizeCheckoutReturn($pdo, $sessionId);
-            if ($result['ok'] ?? false) {
-                setFlash(
-                    'login',
-                    'Tu cuenta quedó activa con el plan ' . (string) ($result['plan_nombre'] ?? 'seleccionado') . '. Inicia sesión para continuar.',
-                    'success'
-                );
-                header('Location: login.php');
-                exit;
-            }
-
-            setFlash(
-                'register',
-                (string) ($result['message'] ?? 'Stripe aún no confirma tu suscripción. Intenta de nuevo en unos segundos.'),
-                (string) ($result['flash_type'] ?? 'warning')
-            );
-            $registerRedirect();
-        }
-
-        if ($checkoutAction === 'cancel') {
-            setFlash('register', 'Cancelaste el checkout. Puedes elegir otro plan o intentarlo de nuevo cuando quieras.', 'warning');
-            $registerRedirect();
-        }
-    } catch (Throwable $exception) {
-        setFlash('register', 'No se pudo validar el checkout de Stripe en este momento. Intenta nuevamente.', 'danger');
-        $registerRedirect();
+if ($checkoutAction === 'success') {
+    $sessionId = trim((string) ($_GET['session_id'] ?? ''));
+    $target = 'payment_success.php';
+    if ($sessionId !== '') {
+        $target .= '?session_id=' . rawurlencode($sessionId);
     }
+
+    header('Location: ' . $target);
+    exit;
+}
+
+if ($checkoutAction === 'cancel') {
+    header('Location: payment_cancel.php');
+    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -78,6 +52,11 @@ $customPlans = array_values(array_filter($plans, static function (array $plan): 
 $countryOptions = getCountryOptions();
 $contactUrl = (string) ($flash['meta']['contact_url'] ?? saasPublicUrl('contact.php?plan=enterprise'));
 $stripeReady = stripeIsConfigured();
+$stripeTestMode = $stripeReady && stripeIsTestMode();
+$googleReady = googleIsConfigured();
+$googleClientId = $googleReady ? googleConfig()['client_id'] : '';
+$googleNonce = $googleReady ? googleAuthNonce(true) : '';
+$googleCallbackUrl = '/Saas/src/auth/google_callback.php';
 
 $old = array_merge([
     'nombre_completo' => '',
@@ -94,6 +73,7 @@ foreach ($selectablePlans as $candidate) {
         break;
     }
 }
+
 if ($defaultPlan === null) {
     $defaultPlan = $selectablePlans[0] ?? null;
 }
@@ -110,6 +90,7 @@ foreach ($selectablePlans as $candidate) {
         break;
     }
 }
+
 if ($selectedPlan === null) {
     $selectedPlan = $defaultPlan;
     $selectedPlanId = (int) ($selectedPlan['id_plan'] ?? 0);
@@ -124,50 +105,62 @@ $formatLimit = static function ($value, string $singular, string $plural, string
     return number_format($number) . ' ' . ($number === 1 ? $singular : $plural);
 };
 
-$planBenefitsText = static function (array $plan): string {
-    $benefits = array_filter(array_map(
-        static fn(array $feature): string => trim((string) ($feature['caracteristica'] ?? '')),
-        array_slice($plan['caracteristicas'] ?? [], 0, 3)
-    ));
-
-    return $benefits === [] ? '' : 'Incluye: ' . implode(' · ', $benefits);
-};
-
 $planCheckoutMode = static function (array $plan): string {
     if (!empty($plan['is_free'])) {
         return 'free';
     }
 
-    return !empty($plan['supports_checkout']) ? 'stripe' : 'pending';
+    if (!empty($plan['is_custom'])) {
+        return 'sales';
+    }
+
+    return 'stripe';
 };
 
-$planSubmitNote = static function (array $plan) use ($planCheckoutMode): string {
+$planSubmitNote = static function (array $plan) use ($planCheckoutMode, $stripeReady): string {
     $mode = $planCheckoutMode($plan);
 
     if ($mode === 'free') {
         return 'La cuenta se crea de inmediato con este plan.';
     }
 
-    if ($mode === 'stripe') {
+    if ($mode === 'sales') {
+        return 'Este plan se coordina con un asesor comercial.';
+    }
+
+    if ($stripeReady) {
         return 'Al crear la cuenta te llevaremos a Stripe para completar el cobro.';
     }
 
-    return 'Este plan estará disponible cuando Stripe esté configurado.';
+    return 'Configura Stripe en este entorno para habilitar el cobro del plan.';
+};
+
+$planCardDescription = static function (array $plan): string {
+    $description = trim((string) ($plan['descripcion'] ?? ''));
+    if ($description !== '') {
+        return $description;
+    }
+
+    if (!empty($plan['is_free'])) {
+        return 'Ideal para explorar Zentra.';
+    }
+
+    if (dbBoolValue($plan['destacado'] ?? false)) {
+        return 'Una opcion equilibrada para crecer con orden.';
+    }
+
+    return 'Pensado para una operacion mas organizada.';
 };
 
 $selectedPlanPriceLabel = (string) ($selectedPlan['precio_label'] ?? '');
-$selectedPlanDescription = (string) ($selectedPlan['descripcion'] ?? '');
-$selectedPlanBenefits = $selectedPlan !== null ? $planBenefitsText($selectedPlan) : '';
+$selectedPlanSummaryMeta = $selectedPlan !== null
+    ? implode(' | ', [
+        $formatLimit($selectedPlan['limite_empresas'] ?? null, 'empresa', 'empresas', 'Escalable'),
+        $formatLimit($selectedPlan['limite_usuarios'] ?? null, 'usuario', 'usuarios', 'Escalable'),
+        $formatLimit($selectedPlan['limite_documentos'] ?? null, 'documento', 'documentos', 'Sin tope fijo'),
+    ])
+    : '';
 $selectedPlanNote = $selectedPlan !== null ? $planSubmitNote($selectedPlan) : '';
-$selectedPlanCompanies = $selectedPlan !== null
-    ? $formatLimit($selectedPlan['limite_empresas'] ?? null, 'empresa', 'empresas', 'Escalable')
-    : 'Escalable';
-$selectedPlanUsers = $selectedPlan !== null
-    ? $formatLimit($selectedPlan['limite_usuarios'] ?? null, 'usuario', 'usuarios', 'Escalable')
-    : 'Escalable';
-$selectedPlanDocs = $selectedPlan !== null
-    ? $formatLimit($selectedPlan['limite_documentos'] ?? null, 'documento', 'documentos', 'Sin tope fijo')
-    : 'Sin tope fijo';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -206,7 +199,7 @@ $selectedPlanDocs = $selectedPlan !== null
 
           <div class="auth-mode-note">
             <h2>Acceso administrativo inicial</h2>
-            <p>Después de esta cuenta, el registro público seguirá con planes y checkout normal.</p>
+            <p>Despues de esta cuenta, el registro publico seguira con planes y checkout normal.</p>
           </div>
 
           <form class="auth-form" method="POST" action="">
@@ -228,7 +221,7 @@ $selectedPlanDocs = $selectedPlan !== null
               </div>
 
               <div class="auth-field">
-                <label for="bootstrapCountry">País</label>
+                <label for="bootstrapCountry">Pais</label>
                 <select name="pais" id="bootstrapCountry" class="auth-select">
                   <?php foreach ($countryOptions as $value => $label): ?>
                   <option value="<?php echo htmlspecialchars((string) $value); ?>" <?php echo (string) ($old['pais'] ?? 'El Salvador') === (string) $value ? 'selected' : ''; ?>>
@@ -241,26 +234,26 @@ $selectedPlanDocs = $selectedPlan !== null
 
             <div class="auth-form-grid">
               <div class="auth-field">
-                <label for="bootstrapPassword">Contraseña</label>
+                <label for="bootstrapPassword">Contrasena</label>
                 <input
                   type="password"
                   name="password"
                   id="bootstrapPassword"
                   class="auth-input"
-                  placeholder="Contraseña"
+                  placeholder="Contrasena"
                   autocomplete="new-password"
                   required
                 >
               </div>
 
               <div class="auth-field">
-                <label for="bootstrapConfirmPassword">Confirmar contraseña</label>
+                <label for="bootstrapConfirmPassword">Confirmar contrasena</label>
                 <input
                   type="password"
                   name="confirm_password"
                   id="bootstrapConfirmPassword"
                   class="auth-input"
-                  placeholder="Confirmar contraseña"
+                  placeholder="Confirmar contrasena"
                   autocomplete="new-password"
                   required
                 >
@@ -271,7 +264,7 @@ $selectedPlanDocs = $selectedPlan !== null
           </form>
 
           <p class="auth-link-line">
-            ¿Ya tienes cuenta? <a href="login.php">Inicia sesión</a>
+            Ya tienes cuenta? <a href="login.php">Inicia sesion</a>
           </p>
 
           <div class="auth-center-links">
@@ -300,17 +293,22 @@ $selectedPlanDocs = $selectedPlan !== null
           </div>
           <?php endif; ?>
 
-          <div class="auth-social-stack">
-            <button type="button" class="auth-social-btn" disabled aria-disabled="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.5 3.9-5.4 3.9-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.2 14.7 2.2 12 2.2 6.8 2.2 2.6 6.4 2.6 11.6S6.8 21 12 21c6.9 0 9.1-4.8 9.1-7.3 0-.5-.1-.9-.1-1.3H12Z"></path>
-                <path fill="#34A853" d="M3.6 7.1l3.2 2.4c.9-1.8 2.8-3.1 5.2-3.1 1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.2 14.7 2.2 12 2.2 8.3 2.2 5 4.3 3.6 7.1Z"></path>
-                <path fill="#FBBC05" d="M12 21c2.6 0 4.8-.9 6.4-2.5l-3.1-2.5c-.8.6-1.9 1-3.3 1-2.5 0-4.5-1.7-5.3-4l-3.3 2.5C4.8 18.6 8.1 21 12 21Z"></path>
-                <path fill="#4285F4" d="M21.1 13.7c0-.5-.1-.9-.1-1.3H12v3.9h5.4c-.3 1.2-1 2.2-2.1 3l3.1 2.5c1.8-1.7 2.7-4.1 2.7-7.1Z"></path>
-              </svg>
-              Registrarme con Google
-            </button>
-            <p class="auth-social-note">Disponible pronto.</p>
+          <div
+            class="auth-social-stack"
+            data-google-auth-root
+            data-google-context="register"
+            data-google-client-id="<?php echo htmlspecialchars($googleClientId); ?>"
+            data-google-callback="<?php echo htmlspecialchars($googleCallbackUrl); ?>"
+            data-google-nonce="<?php echo htmlspecialchars($googleNonce); ?>"
+          >
+            <?php if ($googleReady): ?>
+            <div class="auth-google-slot" data-google-slot></div>
+            <p class="auth-social-note">Crea tu cuenta con Google y conserva el plan que selecciones.</p>
+            <?php else: ?>
+            <button type="button" class="auth-social-btn" disabled aria-disabled="true">Registrarme con Google</button>
+            <p class="auth-social-note">Configura GOOGLE_CLIENT_ID para habilitar este registro.</p>
+            <?php endif; ?>
+            <p class="auth-feedback-note" data-auth-feedback hidden></p>
           </div>
 
           <div class="auth-divider"><span>o completa tu cuenta</span></div>
@@ -363,7 +361,7 @@ $selectedPlanDocs = $selectedPlan !== null
               </div>
 
               <div class="auth-field">
-                <label for="registerCountry">País</label>
+                <label for="registerCountry">Pais</label>
                 <select name="pais" id="registerCountry" class="auth-select">
                   <?php foreach ($countryOptions as $value => $label): ?>
                   <option value="<?php echo htmlspecialchars((string) $value); ?>" <?php echo (string) ($old['pais'] ?? 'El Salvador') === (string) $value ? 'selected' : ''; ?>>
@@ -376,26 +374,26 @@ $selectedPlanDocs = $selectedPlan !== null
 
             <div class="auth-form-grid">
               <div class="auth-field">
-                <label for="registerPassword">Contraseña</label>
+                <label for="registerPassword">Contrasena</label>
                 <input
                   type="password"
                   name="password"
                   id="registerPassword"
                   class="auth-input"
-                  placeholder="Contraseña"
+                  placeholder="Contrasena"
                   autocomplete="new-password"
                   required
                 >
               </div>
 
               <div class="auth-field">
-                <label for="registerPasswordConfirm">Confirmar contraseña</label>
+                <label for="registerPasswordConfirm">Confirmar contrasena</label>
                 <input
                   type="password"
                   name="confirm_password"
                   id="registerPasswordConfirm"
                   class="auth-input"
-                  placeholder="Confirmar contraseña"
+                  placeholder="Confirmar contrasena"
                   autocomplete="new-password"
                   required
                 >
@@ -406,11 +404,13 @@ $selectedPlanDocs = $selectedPlan !== null
             <div class="auth-plan-section">
               <div class="auth-plan-heading">
                 <div>
-                  <h2>Plan</h2>
-                  <p>Elige una opción para continuar.</p>
+                  <p class="auth-plan-eyebrow">Plan disponible</p>
+                  <h2>Selecciona la membresia que mejor se adapta a tu operacion.</h2>
                 </div>
-                <?php if ($customPlans !== []): ?>
-                <a href="<?php echo htmlspecialchars($contactUrl); ?>" class="auth-inline-link">Enterprise</a>
+                <?php if ($stripeTestMode): ?>
+                <p class="auth-plan-status-note">Los pagos estan en modo de prueba.</p>
+                <?php elseif (!$stripeReady): ?>
+                <p class="auth-plan-status-note">Configura Stripe para habilitar los cobros en este entorno.</p>
                 <?php endif; ?>
               </div>
 
@@ -421,19 +421,20 @@ $selectedPlanDocs = $selectedPlan !== null
                   $planCompanies = $formatLimit($plan['limite_empresas'] ?? null, 'empresa', 'empresas', 'Escalable');
                   $planUsers = $formatLimit($plan['limite_usuarios'] ?? null, 'usuario', 'usuarios', 'Escalable');
                   $planDocs = $formatLimit($plan['limite_documentos'] ?? null, 'documento', 'documentos', 'Sin tope fijo');
+                  $planSummaryMeta = implode(' | ', [$planCompanies, $planUsers, $planDocs]);
                   $planNote = $planSubmitNote($plan);
                   $planMode = $planCheckoutMode($plan);
+                  $planBadge = dbBoolValue($plan['destacado'] ?? false) ? 'Recomendado' : '';
+                  $planAction = $isSelected
+                      ? 'Plan seleccionado'
+                      : ($planMode === 'free' ? 'Crear cuenta' : 'Continuar con pago');
                 ?>
                 <label
                   class="auth-plan-option <?php echo $isSelected ? 'is-selected' : ''; ?>"
                   data-plan-card
                   data-plan-name="<?php echo htmlspecialchars((string) ($plan['nombre'] ?? 'Plan')); ?>"
                   data-plan-price-label="<?php echo htmlspecialchars((string) ($plan['precio_label'] ?? '')); ?>"
-                  data-plan-description="<?php echo htmlspecialchars((string) ($plan['descripcion'] ?? '')); ?>"
-                  data-plan-companies="<?php echo htmlspecialchars($planCompanies); ?>"
-                  data-plan-users="<?php echo htmlspecialchars($planUsers); ?>"
-                  data-plan-docs="<?php echo htmlspecialchars($planDocs); ?>"
-                  data-plan-benefits="<?php echo htmlspecialchars($planBenefitsText($plan)); ?>"
+                  data-plan-summary-meta="<?php echo htmlspecialchars($planSummaryMeta); ?>"
                   data-plan-checkout="<?php echo htmlspecialchars($planMode); ?>"
                   data-plan-note="<?php echo htmlspecialchars($planNote); ?>"
                 >
@@ -444,11 +445,22 @@ $selectedPlanDocs = $selectedPlan !== null
                     data-plan-radio
                     <?php echo $isSelected ? 'checked' : ''; ?>
                   >
-                  <span class="auth-plan-option-main">
-                    <span class="auth-plan-option-name"><?php echo htmlspecialchars((string) ($plan['nombre'] ?? 'Plan')); ?></span>
-                    <span class="auth-plan-option-caption"><?php echo htmlspecialchars($planMode === 'free' ? 'Acceso inmediato' : ($planMode === 'stripe' ? 'Pago con Stripe' : 'Pendiente')); ?></span>
+                  <?php if ($planBadge !== ''): ?>
+                  <span class="auth-plan-option-badge"><?php echo htmlspecialchars($planBadge); ?></span>
+                  <?php endif; ?>
+                  <span class="auth-plan-option-head">
+                    <span class="auth-plan-option-main">
+                      <span class="auth-plan-option-name"><?php echo htmlspecialchars((string) ($plan['nombre'] ?? 'Plan')); ?></span>
+                      <span class="auth-plan-option-caption"><?php echo htmlspecialchars($planCardDescription($plan)); ?></span>
+                    </span>
+                    <span class="auth-plan-option-price"><?php echo htmlspecialchars((string) ($plan['precio_label'] ?? '')); ?></span>
                   </span>
-                  <span class="auth-plan-option-price"><?php echo htmlspecialchars((string) ($plan['precio_label'] ?? '')); ?></span>
+                  <ul class="auth-plan-option-list">
+                    <li><?php echo htmlspecialchars($planCompanies); ?></li>
+                    <li><?php echo htmlspecialchars($planUsers); ?></li>
+                    <li><?php echo htmlspecialchars($planDocs); ?></li>
+                  </ul>
+                  <span class="auth-plan-card-action" data-plan-card-action><?php echo htmlspecialchars($planAction); ?></span>
                 </label>
                 <?php endforeach; ?>
               </div>
@@ -457,39 +469,46 @@ $selectedPlanDocs = $selectedPlan !== null
                 <p class="auth-plan-summary-title">Plan seleccionado</p>
                 <p class="auth-plan-summary-line">
                   <span data-plan-summary-name><?php echo htmlspecialchars((string) ($selectedPlan['nombre'] ?? 'Plan')); ?></span>
-                  —
+                  &mdash;
                   <span data-plan-summary-price><?php echo htmlspecialchars($selectedPlanPriceLabel); ?></span>
                 </p>
-                <p class="auth-plan-summary-text" data-plan-summary-description><?php echo htmlspecialchars($selectedPlanDescription); ?></p>
-                <div class="auth-plan-summary-meta">
-                  <span data-plan-summary-companies><?php echo htmlspecialchars($selectedPlanCompanies); ?></span>
-                  <span data-plan-summary-users><?php echo htmlspecialchars($selectedPlanUsers); ?></span>
-                  <span data-plan-summary-docs><?php echo htmlspecialchars($selectedPlanDocs); ?></span>
-                </div>
-                <p class="auth-inline-note" data-plan-summary-benefits><?php echo htmlspecialchars($selectedPlanBenefits); ?></p>
+                <p class="auth-plan-summary-text" data-plan-summary-meta><?php echo htmlspecialchars($selectedPlanSummaryMeta); ?></p>
                 <p class="auth-inline-note" data-plan-note><?php echo htmlspecialchars($selectedPlanNote); ?></p>
-                <?php if (!$stripeReady): ?>
-                <p class="auth-inline-note auth-inline-note--warning">Los planes pagos se habilitan cuando configures Stripe.</p>
-                <?php endif; ?>
-                <?php if ($customPlans !== []): ?>
-                <p class="auth-inline-note">¿Necesitas Enterprise? <a href="<?php echo htmlspecialchars($contactUrl); ?>">Hablar con ventas</a>.</p>
-                <?php endif; ?>
               </div>
+
+              <?php if ($customPlans !== []): ?>
+              <a href="<?php echo htmlspecialchars($contactUrl); ?>" class="auth-plan-enterprise">
+                <span class="auth-plan-enterprise-copy">
+                  <strong>Enterprise</strong>
+                  <span>Capacidad a medida, mas usuarios e implementacion personalizada.</span>
+                </span>
+                <span class="auth-plan-enterprise-link">Hablar con ventas</span>
+              </a>
+              <?php endif; ?>
             </div>
             <?php endif; ?>
 
             <label class="auth-check" for="acceptTerms">
               <input type="checkbox" id="acceptTerms" name="terms" value="1" required>
-              <span>Acepto términos y condiciones</span>
+              <span>Acepto terminos y condiciones</span>
             </label>
 
             <div class="auth-submit-wrap">
-              <button type="submit" class="auth-primary-btn" data-plan-submit>Crear cuenta</button>
+              <button
+                type="submit"
+                class="auth-primary-btn"
+                data-plan-submit
+                data-plan-submit-free="Crear cuenta"
+                data-plan-submit-stripe="Continuar con pago"
+                data-plan-submit-pending="Plan no disponible"
+              >
+                Crear cuenta
+              </button>
             </div>
           </form>
 
           <p class="auth-link-line">
-            ¿Ya tienes cuenta? <a href="login.php">Inicia sesión</a>
+            Ya tienes cuenta? <a href="login.php">Inicia sesion</a>
           </p>
 
           <?php if ($allowAdminSelection): ?>
@@ -508,5 +527,9 @@ $selectedPlanDocs = $selectedPlan !== null
     <script src="../../assets/js/settings.js"></script>
     <script src="../../assets/js/todolist.js"></script>
     <script src="../../assets/js/auth-zentra.js"></script>
+    <?php if ($googleReady): ?>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../../assets/js/auth-google.js"></script>
+    <?php endif; ?>
   </body>
 </html>
