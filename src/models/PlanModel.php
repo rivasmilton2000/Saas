@@ -261,26 +261,12 @@ class PlanModel
                 limite_usuarios,
                 limite_documentos
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (slug) DO UPDATE SET
-                nombre = EXCLUDED.nombre,
-                descripcion = EXCLUDED.descripcion,
-                precio = EXCLUDED.precio,
-                moneda = EXCLUDED.moneda,
-                periodo = EXCLUDED.periodo,
-                billing_interval = EXCLUDED.billing_interval,
-                destacado = EXCLUDED.destacado,
-                is_free = EXCLUDED.is_free,
-                personalizado = EXCLUDED.personalizado,
-                activo = EXCLUDED.activo,
-                trial_days = EXCLUDED.trial_days,
-                orden = EXCLUDED.orden,
-                limite_empresas = EXCLUDED.limite_empresas,
-                limite_usuarios = EXCLUDED.limite_usuarios,
-                limite_documentos = EXCLUDED.limite_documentos,
-                updated_at = CURRENT_TIMESTAMP
+            ON CONFLICT (slug) DO NOTHING
             RETURNING id_plan"
         );
+        $findPlan = $pdo->prepare("SELECT id_plan FROM planes WHERE slug = ? LIMIT 1");
         $deleteFeatures = $pdo->prepare("DELETE FROM planes_caracteristicas WHERE id_plan = ?");
+        $countFeatures = $pdo->prepare("SELECT COUNT(*) FROM planes_caracteristicas WHERE id_plan = ?");
         $insertFeature = $pdo->prepare(
             "INSERT INTO planes_caracteristicas (id_plan, caracteristica, incluido, orden)
              VALUES (?, ?, ?, ?)"
@@ -309,6 +295,24 @@ class PlanModel
             ]);
 
             $idPlan = (int) $insertPlan->fetchColumn();
+            $wasInserted = $idPlan > 0;
+
+            if (!$wasInserted) {
+                $findPlan->execute([(string) ($catalogPlan['slug'] ?? '')]);
+                $idPlan = (int) $findPlan->fetchColumn();
+            }
+
+            if ($idPlan <= 0) {
+                continue;
+            }
+
+            $countFeatures->execute([$idPlan]);
+            $hasFeatures = (int) $countFeatures->fetchColumn() > 0;
+
+            if ($hasFeatures && !$wasInserted) {
+                continue;
+            }
+
             $deleteFeatures->execute([$idPlan]);
 
             foreach (($catalogPlan['caracteristicas'] ?? []) as $index => $feature) {

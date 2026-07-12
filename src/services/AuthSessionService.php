@@ -61,11 +61,15 @@ class AuthSessionService
 
     public static function redirectPathForUser(array $usuario): string
     {
-        if (self::needsPlanSelection($usuario)) {
-            return '/Saas/src/pages/samples/select-plan.php';
-        }
+      if ((string) ($usuario['rol'] ?? 'user') === 'admin') {
+          return '/Saas/src/admin/index.php';
+      }
 
-        return '/Saas/src/index.php';
+      if (self::needsPlanSelection($usuario)) {
+          return '/Saas/src/pages/samples/select-plan.php';
+      }
+
+      return '/Saas/src/index.php';
     }
 
     public static function needsPlanSelection(array $usuario): bool
