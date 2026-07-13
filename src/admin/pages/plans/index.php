@@ -35,6 +35,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $limiteEmpresas = trim((string) ($_POST['limite_empresas'] ?? ''));
         $limiteUsuarios = trim((string) ($_POST['limite_usuarios'] ?? ''));
         $limiteDocumentos = trim((string) ($_POST['limite_documentos'] ?? ''));
+        $featuresText = (string) ($_POST['caracteristicas_text'] ?? '');
 
         if ($nombre === '') {
             setFlash('admin_plans', 'El nombre del plan es obligatorio.', 'danger');
@@ -73,6 +74,40 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $limiteDocumentos !== '' ? (int) $limiteDocumentos : null,
             $planId,
         ]);
+
+        $deleteFeatures = $pdo->prepare("DELETE FROM planes_caracteristicas WHERE id_plan = ?");
+        $insertFeature = $pdo->prepare(
+            "INSERT INTO planes_caracteristicas (id_plan, caracteristica, incluido, orden)
+             VALUES (?, ?, ?, ?)"
+        );
+        $deleteFeatures->execute([$planId]);
+
+        $featureLines = preg_split('/\R/u', $featuresText) ?: [];
+        $featureOrder = 1;
+        foreach ($featureLines as $featureLine) {
+            $featureLine = trim((string) $featureLine);
+            if ($featureLine === '') {
+                continue;
+            }
+
+            $included = true;
+            if (str_starts_with($featureLine, '- ') || str_starts_with($featureLine, '!')) {
+                $included = false;
+                $featureLine = trim(ltrim(substr($featureLine, 1)));
+            }
+
+            if ($featureLine === '') {
+                continue;
+            }
+
+            $insertFeature->execute([
+                $planId,
+                $featureLine,
+                dbBoolParam($included),
+                $featureOrder,
+            ]);
+            $featureOrder++;
+        }
 
         BitacoraService::registrar(
             $pdo,
@@ -155,6 +190,18 @@ $flashClass = match ((string) ($flash['type'] ?? 'info')) {
             <div class="col-4">Usuarios<br><strong><?php echo htmlspecialchars((string) ($plan['limite_usuarios'] ?? 'Libre')); ?></strong></div>
             <div class="col-4">Docs<br><strong><?php echo htmlspecialchars((string) ($plan['limite_documentos'] ?? 'Libre')); ?></strong></div>
           </div>
+
+          <ul class="list-unstyled text-muted small mb-3">
+            <?php foreach (array_slice(($plan['caracteristicas'] ?? []), 0, 5) as $feature): ?>
+            <li class="mb-1">
+              <i class="mdi <?php echo dbBoolValue($feature['incluido'] ?? true) ? 'mdi-check text-success' : 'mdi-close text-danger'; ?>"></i>
+              <?php echo htmlspecialchars((string) ($feature['caracteristica'] ?? '')); ?>
+            </li>
+            <?php endforeach; ?>
+            <?php if (count($plan['caracteristicas'] ?? []) > 5): ?>
+            <li>+ <?php echo number_format(count($plan['caracteristicas']) - 5); ?> mas</li>
+            <?php endif; ?>
+          </ul>
 
           <div class="d-flex justify-content-between align-items-center">
             <span class="text-muted small"><?php echo number_format($usersTotal); ?> usuarios</span>
@@ -248,9 +295,16 @@ $flashClass = match ((string) ($flash['type'] ?? 'info')) {
             <div class="col-md-4">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="plan_activo" name="activo" value="1">
-                <label class="form-check-label" for="plan_activo">Activo</label>
+              <label class="form-check-label" for="plan_activo">Activo</label>
               </div>
             </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label" for="plan_caracteristicas_text">Caracteristicas</label>
+            <textarea class="form-control" id="plan_caracteristicas_text" name="caracteristicas_text" rows="9"></textarea>
+            <p class="text-muted small mt-2 mb-0">
+              Escribe una caracteristica por linea. Para marcar una como no incluida, inicia la linea con "- " o "!". Ejemplo: "- Soporte prioritario".
+            </p>
           </div>
         </div>
         <div class="modal-footer">
@@ -280,6 +334,13 @@ $flashClass = match ((string) ($flash['type'] ?? 'info')) {
         document.getElementById('plan_destacado').checked = Boolean(plan.destacado === true || plan.destacado === 1 || plan.destacado === '1');
         document.getElementById('plan_personalizado').checked = Boolean(plan.personalizado === true || plan.personalizado === 1 || plan.personalizado === '1');
         document.getElementById('plan_activo').checked = Boolean(plan.activo === true || plan.activo === 1 || plan.activo === '1');
+        document.getElementById('plan_caracteristicas_text').value = Array.isArray(plan.caracteristicas)
+          ? plan.caracteristicas.map(function (feature) {
+              const text = feature.caracteristica || '';
+              const included = !(feature.incluido === false || feature.incluido === 0 || feature.incluido === '0');
+              return included ? text : '- ' + text;
+            }).join('\n')
+          : '';
       });
     });
   });
