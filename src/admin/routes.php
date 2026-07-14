@@ -30,6 +30,18 @@
           'title' => 'Uso DTE',
           'file' => __DIR__ . '/pages/dte/usage.php',
       ],
+      'dte.documents' => [
+          'title' => 'Documentos DTE',
+          'file' => __DIR__ . '/pages/dte/documents.php',
+      ],
+      'dte.books' => [
+          'title' => 'Libros DTE',
+          'file' => __DIR__ . '/pages/dte/books.php',
+      ],
+      'dte.quotas' => [
+          'title' => 'Cuotas DTE',
+          'file' => __DIR__ . '/pages/dte/quotas.php',
+      ],
       'audit' => [
           'title' => 'Bitacora',
           'file' => __DIR__ . '/pages/audit/bitacora.php',
