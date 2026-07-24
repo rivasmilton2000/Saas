@@ -1,3 +1,3 @@
 <?php
-header('Location: /Saas/src/index.php');
+header('Location: /Saas/src/app/index.php');
 exit;

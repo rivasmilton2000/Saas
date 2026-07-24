@@ -69,7 +69,7 @@ class AuthSessionService
           return '/Saas/src/pages/samples/select-plan.php';
       }
 
-      return '/Saas/src/index.php';
+      return '/Saas/src/app/index.php';
     }
 
     public static function needsPlanSelection(array $usuario): bool

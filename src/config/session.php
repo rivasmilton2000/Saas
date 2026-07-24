@@ -16,7 +16,7 @@ function requireLogin(): void {
 
 function requireGuest(): void {
     if (isLoggedIn()) {
-        header('Location: /Saas/src/index.php');
+        header('Location: ' . (isAdmin() ? '/Saas/src/admin/index.php' : '/Saas/src/app/index.php'));
         exit;
     }
 }
@@ -31,14 +31,14 @@ function isUser(): bool {
 
 function requireAdmin(): void {
     if (!isAdmin()) {
-        header('Location: /Saas/src/index.php');
+        header('Location: /Saas/src/app/index.php');
         exit;
     }
 }
 
 function requireUser(): void {
     if (!isUser()) {
-        header('Location: /Saas/src/index.php');
+        header('Location: /Saas/src/admin/index.php');
         exit;
     }
 }

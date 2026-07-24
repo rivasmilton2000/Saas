@@ -154,7 +154,7 @@ class GoogleAuthService
 
                 return [
                     'ok' => true,
-                    'redirect_url' => '/Saas/src/index.php',
+                    'redirect_url' => '/Saas/src/app/index.php',
                 ];
             }
 

@@ -80,7 +80,7 @@ class CentroMandoService {
                         $modulo     = getLibroModule($tipoLibro);
                         $rutaModulo = trim((string) ($modulo['ruta'] ?? ''));
                         if ($rutaModulo !== '') {
-                            $ruta = '/Saas/src/index.php?activate_company=' . $empresaId . '&redirect_to=' . rawurlencode($rutaModulo);
+                            $ruta = '/Saas/src/app/index.php?activate_company=' . $empresaId . '&redirect_to=' . rawurlencode($rutaModulo);
                         }
                     } else {
                         $completado = !empty($avanceMap[$empresaId][$itemKey]);

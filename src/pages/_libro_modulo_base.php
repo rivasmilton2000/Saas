@@ -25,7 +25,16 @@ $idUsuario        = (int) $session['id_usuario'];
 $basePath         = '../';
 $flashKey         = 'libro_' . $tipoLibro;
 $importSessionKey = '_import_result_' . $tipoLibro;
-$rutaModulo       = '/Saas/src/' . ltrim((string) ($modulo['ruta'] ?? ''), '/');
+$appModuleRoutes  = [
+    'compras' => 'dte.purchases',
+    'ventas_consumidor' => 'dte.consumer-sales',
+    'ventas_contribuyente' => 'dte.taxpayer-sales',
+    'retencion_iva' => 'dte.vat-withholdings',
+];
+$appModuleRoute   = $appModuleRoutes[$tipoLibro] ?? '';
+$rutaModulo       = isset($appBaseUrl) && $appModuleRoute !== ''
+    ? $appBaseUrl . '?page=' . rawurlencode($appModuleRoute)
+    : '/Saas/src/' . ltrim((string) ($modulo['ruta'] ?? ''), '/');
 $meses            = [
     1 => 'Enero',
     2 => 'Febrero',

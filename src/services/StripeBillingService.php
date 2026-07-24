@@ -104,7 +104,7 @@ class StripeBillingService
 
         $session = self::client()->billingPortal->sessions->create([
             'customer' => $customerId,
-            'return_url' => $returnUrl ?: saasUrl('src/index.php'),
+            'return_url' => $returnUrl ?: saasUrl('src/app/index.php'),
         ]);
 
         return (string) $session->url;

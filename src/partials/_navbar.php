@@ -31,7 +31,7 @@ if (!empty($profileUsuario['created_at'])) {
     }
 }
 
-$profileRedirectTo = (string) ($_SERVER['REQUEST_URI'] ?? '/Saas/src/index.php');
+$profileRedirectTo = (string) ($_SERVER['REQUEST_URI'] ?? '/Saas/src/app/index.php');
 $profileAlertClass = 'info';
 if (!empty($profileFlash['type'])) {
     $profileAlertClass = match ((string) $profileFlash['type']) {

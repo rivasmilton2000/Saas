@@ -19,7 +19,7 @@ if ($user === null) {
 }
 
 if (!UserPlanSelectionService::canAccessSelection($user)) {
-    header('Location: /Saas/src/index.php');
+    header('Location: ' . (isAdmin() ? '/Saas/src/admin/index.php' : '/Saas/src/app/index.php'));
     exit;
 }
 
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         AuthSessionService::refreshFromDatabase($pdo, (int) $freshUser['id']);
     }
 
-    header('Location: /Saas/src/index.php');
+    header('Location: /Saas/src/app/index.php');
     exit;
 }
 

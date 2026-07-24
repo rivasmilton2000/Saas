@@ -6,7 +6,7 @@ require_once __DIR__ . '/../services/BitacoraService.php';
 
 requireLogin();
 
-function profileRedirectTarget(string $fallback = '/Saas/src/index.php'): string {
+function profileRedirectTarget(string $fallback = '/Saas/src/app/index.php'): string {
     $raw = trim((string) ($_POST['redirect_to'] ?? $_SERVER['HTTP_REFERER'] ?? $fallback));
     if ($raw === '') {
         return $fallback;
