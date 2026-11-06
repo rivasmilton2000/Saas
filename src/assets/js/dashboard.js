@@ -302,6 +302,7 @@
           '</tr>'+
       '</table>';
   }
+    if ($('#example').length && $.fn.DataTable) {
     var table = $('#example').DataTable( {
       "ajax": "../assets/js/data.txt",
       "columns": [
@@ -348,5 +349,6 @@
           tr.addClass('shown');
       }
     });
+    }
   });
 })(jQuery);

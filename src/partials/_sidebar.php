@@ -1,7 +1,7 @@
 <nav class="sidebar sidebar-offcanvas" id="sidebar">
   <ul class="nav">
     <li class="nav-item">
-      <a class="nav-link" href="../index.php">
+      <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/index.php')); ?>">
         <i class="icon-grid menu-icon"></i>
         <span class="menu-title">Dashboard</span>
       </a>
@@ -14,9 +14,9 @@
       </a>
       <div class="collapse" id="ui-basic">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/ui-features/buttons.php">Buttons</a></li>
-          <li class="nav-item"> <a class="nav-link" href="../pages/ui-features/dropdowns.php">Dropdowns</a></li>
-          <li class="nav-item"> <a class="nav-link" href="../pages/ui-features/typography.php">Typography</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/buttons.php')); ?>">Buttons</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/dropdowns.php')); ?>">Dropdowns</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/typography.php')); ?>">Typography</a></li>
         </ul>
       </div>
     </li>
@@ -28,7 +28,7 @@
       </a>
       <div class="collapse" id="form-elements">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"><a class="nav-link" href="../pages/forms/basic_elements.html">Basic Elements</a></li>
+          <li class="nav-item"><a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/forms/basic_elements.php')); ?>">Basic Elements</a></li>
         </ul>
       </div>
     </li>
@@ -40,7 +40,7 @@
       </a>
       <div class="collapse" id="charts">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/charts/chartjs.html">ChartJs</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/charts/chartjs.php')); ?>">ChartJs</a></li>
         </ul>
       </div>
     </li>
@@ -52,7 +52,7 @@
       </a>
       <div class="collapse" id="tables">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/tables/basic-table.html">Basic table</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/tables/basic-table.php')); ?>">Basic table</a></li>
         </ul>
       </div>
     </li>
@@ -64,7 +64,7 @@
       </a>
       <div class="collapse" id="icons">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/icons/mdi.html">Mdi icons</a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/icons/mdi.php')); ?>">Mdi icons</a></li>
         </ul>
       </div>
     </li>
@@ -76,8 +76,8 @@
       </a>
       <div class="collapse" id="auth">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/samples/login.php"> Login </a></li>
-          <li class="nav-item"> <a class="nav-link" href="../pages/samples/register.php"> Register </a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/login.php')); ?>"> Login </a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/register.php')); ?>"> Register </a></li>
         </ul>
       </div>
     </li>
@@ -89,13 +89,13 @@
       </a>
       <div class="collapse" id="error">
         <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="../pages/samples/error-404.php"> 404 </a></li>
-          <li class="nav-item"> <a class="nav-link" href="../pages/samples/error-500.php"> 500 </a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/error-404.php')); ?>"> 404 </a></li>
+          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/error-500.php')); ?>"> 500 </a></li>
         </ul>
       </div>
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="../../../docs/documentation.html">
+      <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/docs/documentation.html')); ?>">
         <i class="icon-paper menu-icon"></i>
         <span class="menu-title">Documentation</span>
       </a>

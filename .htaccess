@@ -1,0 +1,9 @@
+Options -Indexes
+
+<FilesMatch "(?i)(\.(sql|md|log|ini|env|bak|dump)$|^package.*\.json$)">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteRule ^(?:\.git|scripts|tests|var)(?:/|$) - [F,L,NC]
+RewriteRule ^src/config(?:/|$) - [F,L,NC]
