@@ -11,4 +11,12 @@
 .auth-field select.auth-input{width:100%}
 .pricing_card button.btn_pricing{cursor:pointer}
 .section-top{background-color:#28233f}
+.public-web-services{margin-top:30px;scroll-margin-top:24px}
+.public-secondary-action{margin-left:15px}
+.contact_form_card label{color:#1b2032;font-size:14px;margin-bottom:8px}
+.contact_form_card select.form-control{padding:10px 15px}
+.social_profile ul li>span{display:block;text-align:center;margin-right:10px;font-size:16px;color:#fff;width:40px;height:40px;line-height:40px;border-radius:30px}
+.public-web-services .btn_one:focus-visible,.single_benefit .btn_one:focus-visible,.zentra-nav .nav-link:focus-visible,.contact_btn:focus-visible{outline:2px solid #1760ff;outline-offset:4px}
+@media(max-width:768px){.social_profile ul li>span{margin-bottom:10px}}
+@media(max-width:767px){.public-web-services>div{margin-bottom:30px}.public-secondary-action{margin-left:0}.contact_form_card{padding:28px}}
 @media(max-width:1199px){.zentra-menu-links{display:none;background:#fff;padding:16px!important}.zentra-menu-links.is-open{display:block}.zentra-menu-links .site-menu li{display:block!important;text-align:left}.zentra-menu-links .site-menu a{color:#25213b!important}}

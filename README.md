@@ -1,8 +1,10 @@
-# Zentra · etapa 2
+# Zentra · etapa 3
 
 Aplicacion activa: **NestJS + TypeScript**, **React + TypeScript**, MySQL/MariaDB.
 Los dashboards de Usuario y Administrador comparten el diseño de `src/pages/dashboard`.
 Incluyen empresas, diario de doble partida, catálogo, balance, libros DTE y administración.
+El sitio público conserva el diseño original e incorpora servicios de sitios web, dominios y
+hosting, con consultas clasificadas mediante el formulario de contacto existente.
 El PHP anterior se conserva como referencia protegida.
 
 Desde PowerShell, en la raiz real del repositorio:
@@ -38,6 +40,7 @@ Verificacion:
 ```powershell
 npm.cmd run build:backend
 npm.cmd run build:frontend
+npm.cmd run typecheck:tests
 npm.cmd run test:integration
 npx.cmd playwright install chromium
 npm.cmd run test:browser
@@ -48,7 +51,8 @@ La cuenta MySQL necesita permiso CREATE/DROP DATABASE para esas pruebas; la apli
 normal no lo necesita. No ejecutar dos suites de navegador simultaneamente: usan el puerto 3101.
 
 Conexion unica: [`conexion/conexiones.ts`](conexion/conexiones.ts).
-Rutas, modelo, credenciales demo y resultados: [`docs/ETAPA_2.md`](docs/ETAPA_2.md).
+Sitio público, arranque y revisión final: [`docs/ETAPA_3.md`](docs/ETAPA_3.md).
+Rutas por rol, modelo y credenciales demo: [`docs/ETAPA_2.md`](docs/ETAPA_2.md).
 
 Para preparar las **dos cuentas de demostración** en desarrollo:
 

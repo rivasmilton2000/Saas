@@ -11,6 +11,8 @@ export async function testEnvironment(){
   const original=process.env.DB_NAME!;const database=`zentra_test_${randomBytes(6).toString('hex')}`;
   const setup=new MysqlService();await setup.run(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);await setup.onApplicationShutdown();
   process.env.DB_NAME=database;process.env.NODE_ENV='test';process.env.APP_URL='http://127.0.0.1:3101';process.env.FRONTEND_ORIGIN='http://127.0.0.1:3101';
+  // Las pruebas no envian correo ni contactan cuentas externas configuradas en el entorno local.
+  for(const key of ['MAIL_HOST','MAIL_FROM','MAIL_USERNAME','MAIL_PASSWORD','STRIPE_SECRET_KEY','STRIPE_WEBHOOK_SECRET','GOOGLE_CLIENT_ID'])delete process.env[key];
   const app=await createApp();const db=app.get(MysqlService);await migrate(db);const demo=await seedDemo(db,app.get(AccountingService),demoPasswords);
   const close=async()=>{await app.close();process.env.DB_NAME=original;const cleanup=new MysqlService();try{if(!/^zentra_test_[a-f0-9]{12}$/.test(database))throw Error('Nombre de prueba invalido.');await cleanup.run(`DROP DATABASE IF EXISTS \`${database}\``);}finally{await cleanup.onApplicationShutdown();}};
   return {app,db,demo,database,original,close};

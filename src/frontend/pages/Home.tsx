@@ -1,4 +1,6 @@
-// Contenido y clases conservados desde src/public/index.php.
+// Contenido y clases conservados desde src/public/index.php; servicios ampliados en React.
+import {Link} from 'react-router-dom';
+import {WebServices} from './WebServices';
 export function Home() { return <>
 
 
@@ -29,12 +31,12 @@ export function Home() { return <>
 
 
 
-<section className="benefits_area section-padding">
+<section className="benefits_area section-padding" id="servicios">
 <div className="container">
 <div className="section-title text-center">
 <h2>{"¿Qué ofrecemos?"}</h2>
 
-<p>{"\n                Soluciones diseñadas para simplificar la gestión empresarial y ayudarte\n                a mantener el control de tu negocio desde una sola plataforma.\n            "}</p>
+<p>Soluciones contables para gestionar tu empresa y servicios web para dar a conocer tu negocio.</p>
 </div>
 
 <div className="row">
@@ -44,7 +46,7 @@ export function Home() { return <>
 
 <h4>{"Facturación Electrónica"}</h4>
 
-<p>{"\n                        Emite y administra documentos tributarios electrónicos de forma rápida,\n                        segura y conforme a la normativa vigente.\n                    "}</p>
+<p>Organiza tus documentos tributarios electrónicos y consulta tus libros de compras, ventas y retenciones.</p>
 </div>
 </div>
 
@@ -54,7 +56,8 @@ export function Home() { return <>
 
 <h4>{"Gestión Empresarial"}</h4>
 
-<p>{"\n                        Centraliza ventas, compras y procesos administrativos en una sola plataforma.\n                    "}</p>
+<p>Centraliza tu contabilidad, compras y ventas. Trabaja con diario, balance y libros DTE por empresa.</p>
+<Link className="btn_one" to="/contact?service=contabilidad">Consultar servicios contables</Link>
 </div>
 </div>
 
@@ -98,6 +101,7 @@ export function Home() { return <>
 </div>
 </div>
 </div>
+<WebServices/>
 </div>
 </section>
 

@@ -7,6 +7,8 @@ import { About } from './pages/About';
 import { Footer } from './pages/Footer';
 import './zentra.css';
 import { Dashboard, LegacyDashboardRedirect } from './dashboard/Dashboard';
+import { contactServices, contactSubjectLimit, selectedContactService, type ContactService } from '../shared/public-services';
+import {usePublicNavigation} from './use-public-navigation';
 
 function Styles({auth = false}: {auth?: boolean}) {
   const files = auth ? ['/auth-assets/vendors/css/vendor.bundle.base.css','/auth-assets/css/style.css','/auth-assets/css/auth-zentra.css']
@@ -15,16 +17,15 @@ function Styles({auth = false}: {auth?: boolean}) {
 }
 function PublicLayout() {
   const [open,setOpen] = useState(false);
-  const location = useLocation();
-  useEffect(() => {setOpen(false);window.scrollTo(0,0);document.title = 'Zentra';}, [location.pathname]);
+  usePublicNavigation(setOpen);
   return <><Styles /><header className="site-navbar site-navbar-target zentra-nav" role="banner"><div className="container"><div className="row align-items-center">
     <div className="col-6 col-xl-2"><h1 className="mb-0 site-logo"><Link to="/"><img src="/public-assets/img/Zentra_logo.png" alt="Zentra" style={{maxWidth:100}} /></Link></h1></div>
-    <div className="col-6 d-xl-none text-right"><button className="zentra-menu" aria-label="Abrir menu" aria-expanded={open} onClick={() => setOpen(!open)}>☰</button></div>
-    <nav aria-label="Navegacion principal" className={`col-12 col-xl-10 site-navigation text-right zentra-menu-links ${open ? 'is-open' : ''}`}><ul className="site-menu main-menu">
-      {[['/','Inicio'],['/about','Acerca de'],['/pricing','Planes'],['/contact','Contactanos'],['/login','Inicia Sesión']].map(([to,label]) => <li key={to}><Link className="nav-link" to={to}>{label}</Link></li>)}
+    <div className="col-6 d-xl-none text-right"><button className="zentra-menu" aria-label="Abrir menu" aria-controls="public-navigation" aria-expanded={open} onClick={() => setOpen(!open)}>☰</button></div>
+    <nav id="public-navigation" aria-label="Navegacion principal" className={`col-12 col-xl-10 site-navigation text-right zentra-menu-links ${open ? 'is-open' : ''}`}><ul className="site-menu main-menu">
+      {[['/','Inicio'],['/#servicios','Servicios'],['/about','Acerca de'],['/pricing','Planes'],['/contact','Contactanos'],['/login','Inicia Sesión']].map(([to,label]) => <li key={to}><Link className="nav-link" to={to}>{label}</Link></li>)}
     </ul></nav></div></div></header><Outlet /><Footer /></>;
 }
-function Banner({title}: {title: string}) { return <section className="section-top"><div className="container"><div className="col-lg-12 text-center"><div className="section-top-title"><h1>{title}</h1><ul><li><Link to="/">Inicio</Link></li><li>{title}</li></ul></div></div></div></section>; }
+function Banner({title}: {title: string}) { return <section className="section-top" style={{backgroundImage:'url(/public-assets/img/bg/section-top.png)',backgroundSize:'cover',backgroundPosition:'center'}}><div className="container"><div className="col-lg-12 text-center"><div className="section-top-title"><h1>{title}</h1><ul><li><Link to="/">Inicio</Link></li><li>{title}</li></ul></div></div></div></section>; }
 function Feedback({message}: {message: string}) { return message ? <div className="auth-alert" role="alert">{message}</div> : null; }
 function PlanCards({plans,onSelect}: {plans: Plan[]; onSelect?: (id: number) => void}) {
   return <div className="row justify-content-center">{plans.map(plan => <div className="col-lg-4 col-md-6" key={plan.id_plan}><div className={`pricing_card ${plan.destacado ? 'featured' : ''}`}>
@@ -41,20 +42,25 @@ function usePlans() {
 function Pricing() {const {plans,error}=usePlans();return <><Banner title="Planes" /><section className="pricing_area section-padding"><div className="container"><div className="section-title text-center"><h2>Planes flexibles</h2><p>Elige el plan que mejor se adapte al tamaño y operación de tu negocio.</p></div><Feedback message={error} /><PlanCards plans={plans} /></div></section></>;}
 function Contact() {
   const [message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+  const location=useLocation(),params=new URLSearchParams(location.search);
+  const requested=params.get('plan')==='enterprise'?'contabilidad':selectedContactService(params.get('service'));
+  const [service,setService]=useState<ContactService>(requested);
+  useEffect(()=>{setService(requested);setMessage('');},[requested,location.key]);
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();setBusy(true);const form=event.currentTarget;
-    try {const result=await api('/public/contact',Object.fromEntries(new FormData(form)));setMessage(result.message);form.reset();}
+    try {const result=await api('/public/contact',Object.fromEntries(new FormData(form)));setMessage(result.message);form.reset();setService('general');}
     catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
   }
-  return <><Banner title="Contáctanos" /><section className="contact_area section-padding"><div className="container"><div className="section-title text-center"><h2>Hablemos de tu negocio</h2><p>Estamos para ayudarte.</p></div><div className="row">
+  return <><Banner title="Contáctanos" /><section id="contact" className="contact_page_area section-padding"><div className="container"><div className="section-title text-center"><h2>Hablemos de tu negocio</h2><p>Cuéntanos qué necesitas para tu contabilidad, tu sitio web, tu dominio o tu hosting.</p></div><div className="row contact_info_row">
     {[['fa-envelope','Correo','zentragroup1@gmail.com'],['fa-phone','Teléfono','+503 7934-6671'],['fa-clock-o','Horario','Lunes a Domingos']].map(([icon,title,text]) => <div className="col-lg-4 col-md-6" key={title}><div className="contact_info_card"><i className={`fa ${icon}`} /><h4>{title}</h4><p>{text}</p></div></div>)}
-    </div><div className="row justify-content-center"><div className="col-lg-9"><div className="contact_form_card"><Feedback message={message} /><form onSubmit={send}><div className="row">
+    </div><div className="row justify-content-center"><div className="col-lg-9"><div className="contact_form_card"><Feedback message={message} /><form onSubmit={send} aria-busy={busy}><fieldset className="row" disabled={busy}>
       <div className="form-group col-md-6"><input aria-label="Nombre completo" name="name" maxLength={100} className="form-control" placeholder="Nombre completo" required /></div>
       <div className="form-group col-md-6"><input aria-label="Correo electrónico" name="email" type="email" maxLength={150} className="form-control" placeholder="Correo electrónico" required /></div>
-      <div className="form-group col-md-12"><input aria-label="Asunto" name="subject" maxLength={150} className="form-control" placeholder="Asunto" required /></div>
+      <div className="form-group col-md-12"><label htmlFor="contact-service">Servicio de interés</label><select id="contact-service" name="service" className="form-control" value={service} onChange={event=>setService(event.target.value as ContactService)}>{Object.entries(contactServices).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></div>
+      <div className="form-group col-md-12"><input aria-label="Asunto" name="subject" maxLength={contactSubjectLimit(service)} defaultValue={params.get('plan')==='enterprise'?'Consulta sobre el plan Enterprise':''} className="form-control" placeholder="Asunto" required /></div>
       <div className="form-group col-md-12"><textarea aria-label="Mensaje" name="message" maxLength={20000} rows={6} className="form-control" placeholder="Escribe tu mensaje..." required /></div>
       <div className="col-md-12 text-center"><button disabled={busy} type="submit" className="contact_btn">{busy ? 'Enviando…' : 'Enviar Mensaje'}</button></div>
-    </div></form></div></div></div></div></section></>;
+    </fieldset></form></div></div></div></div></section></>;
 }
 declare global { interface Window {google?: {accounts: {id: {initialize: (options: Record<string,unknown>) => void; renderButton: (element: HTMLElement, options: Record<string,unknown>) => void}}};} }
 function GoogleButton({onError}: {onError: (message: string) => void}) {

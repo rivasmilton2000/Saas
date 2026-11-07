@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { z } from 'zod';
 import { MysqlService } from '../../conexion/conexiones';
 import { ok, validate } from './common';
+import {contactServices,contactSubject,contactSubjectLimit,type ContactService} from '../shared/public-services';
 
 export interface Plan {
   id_plan: number; slug: string; nombre: string; descripcion: string; precio: string | null;
@@ -61,12 +62,14 @@ export class PublicController {
     const data = validate(z.object({
       name: z.string().trim().min(1, 'Escribe tu nombre.').max(100), email: z.email('Email invalido.').max(150),
       subject: z.string().trim().min(1, 'Escribe el asunto.').max(150), message: z.string().trim().min(1, 'Escribe el mensaje.').max(20000),
-    }), input);
-    await this.db.run('INSERT INTO mensajes_contacto(nombre,email,asunto,mensaje) VALUES (?,?,?,?)', [data.name,data.email,data.subject,data.message]);
+      service: z.enum(Object.keys(contactServices) as [ContactService,...ContactService[]],{error:'Selecciona un servicio válido.'}).default('general'),
+    }).refine(value=>value.subject.length<=contactSubjectLimit(value.service),'El asunto es demasiado largo para el servicio seleccionado.'), input);
+    const subject=contactSubject(data.service,data.subject);
+    await this.db.run('INSERT INTO mensajes_contacto(nombre,email,asunto,mensaje) VALUES (?,?,?,?)', [data.name,data.email,subject,data.message]);
     try {
-      await this.mail.send(process.env.MAIL_CONTACT_TO || process.env.MAIL_FROM || '', `Consulta: ${data.subject}`, data.message, {name: data.name, address: data.email});
-      return ok({ saved: true, emailSent: true }, 'Correo enviado correctamente.');
-    } catch { return ok({ saved: true, emailSent: false }, 'Mensaje guardado. El correo no pudo enviarse en este momento.'); }
+      await this.mail.send(process.env.MAIL_CONTACT_TO || process.env.MAIL_FROM || '', `Consulta: ${subject}`, data.message, {name: data.name, address: data.email});
+      return ok({ saved: true, emailSent: true, service:data.service }, 'Correo enviado correctamente.');
+    } catch { return ok({ saved: true, emailSent: false, service:data.service }, 'Mensaje guardado. El correo no pudo enviarse en este momento.'); }
   }
 }
 

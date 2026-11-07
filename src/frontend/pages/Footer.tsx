@@ -1,3 +1,5 @@
+import {Link} from 'react-router-dom';
+import {contactServices,webServices} from '../../shared/public-services';
 export function Footer() { return <>
 
 <div className="footer" style={{"backgroundImage":"url(/public-assets/img/bg/footer.png)","backgroundSize":"cover"}}>
@@ -12,30 +14,30 @@ export function Footer() { return <>
 <p>{"\n                    Zentra es una plataforma empresarial diseñada para simplificar\n                    la gestión de ventas, compras, inventario, clientes y documentos\n                    tributarios electrónicos desde un solo lugar.\n                "}</p>
 </div>
 
-<div className="social_profile">
+<div className="social_profile" aria-hidden="true">
 <ul>
 <li>
-<a href="#" className="f_facebook">
+<span className="f_facebook">
 <i className="fa fa-facebook"></i>
-</a>
+</span>
 </li>
 
 <li>
-<a href="#" className="f_twitter">
+<span className="f_twitter">
 <i className="fa fa-youtube"></i>
-</a>
+</span>
 </li>
 
 <li>
-<a href="#" className="f_instagram">
+<span className="f_instagram">
 <i className="fa fa-instagram"></i>
-</a>
+</span>
 </li>
 
 <li>
-<a href="#" className="f_linkedin">
+<span className="f_linkedin">
 <i className="fa fa-linkedin"></i>
-</a>
+</span>
 </li>
 </ul>
 </div>
@@ -72,15 +74,8 @@ export function Footer() { return <>
 <h4>{"Soluciones"}</h4>
 
 <ul>
-<li><a href="#">{"Facturación Electrónica"}</a></li>
-
-<li><a href="#">{"Control de Inventario"}</a></li>
-
-<li><a href="#">{"Clientes y Proveedores"}</a></li>
-
-<li><a href="#">{"Reportes Inteligentes"}</a></li>
-
-<li><a href="#">{"Plataforma en la Nube"}</a></li>
+<li><Link to="/contact?service=contabilidad" aria-label="Servicios contables">Servicios contables</Link></li>
+{webServices.map(service=><li key={service.id}><Link to={`/contact?service=${service.id}`} aria-label={contactServices[service.id]}>{contactServices[service.id]}</Link></li>)}
 </ul>
 </div>
 </div>

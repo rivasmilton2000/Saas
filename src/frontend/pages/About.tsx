@@ -1,4 +1,5 @@
 // Contenido y clases conservados desde src/public/about.php.
+import {Link} from 'react-router-dom';
 export function About() { return <>
 
 
@@ -37,6 +38,7 @@ export function About() { return <>
 <p>{"\n                        Zentra es una plataforma empresarial diseñada para ayudar a empresas,\n                        emprendedores y profesionales a gestionar sus operaciones de forma más eficiente,\n                        segura y organizada.\n                    "}</p>
 
 <p>{"\n                        Nuestra solución integra herramientas de facturación electrónica,\n                        ventas, compras, inventario, clientes, proveedores y reportes,\n                        permitiendo centralizar toda la información del negocio en un solo lugar.\n                    "}</p>
+<p>También acompañamos la presencia web de tu negocio con diseño y desarrollo de sitios, registro y configuración de dominios, y hosting y publicación.</p>
 
 <p>{"\n                        Nacimos con la visión de simplificar los procesos administrativos y\n                        facilitar la adaptación de las empresas a las nuevas exigencias\n                        tecnológicas y fiscales, impulsando su crecimiento mediante el uso de la tecnología.\n                    "}</p>
 </div>
@@ -113,6 +115,7 @@ export function About() { return <>
 <p>{"\n                                Descubre cómo Zentra puede ayudarte a optimizar tus procesos,\n                                controlar tus operaciones y cumplir con las nuevas exigencias\n                                tecnológicas y fiscales desde una sola plataforma.\n                            "}</p>
 
 <a className="btn_one" href="/pricing">{"\n                                Ver Planes\n                            "}</a>
+<Link className="btn_one public-secondary-action" to="/#servicios-web">Conocer servicios web</Link>
 </div>
 </div>
 </div>

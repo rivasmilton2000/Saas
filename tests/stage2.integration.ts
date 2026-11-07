@@ -4,6 +4,8 @@ import {AccountingService} from '../src/backend/accounting';
 import {seedDemo} from '../scripts/seed-demo';
 import {migrate} from '../conexion/migrate';
 import {testEnvironment,demoPasswords} from './test-environment';
+import {contactServices,contactSubject,contactSubjectLimit,type ContactService} from '../src/shared/public-services';
+import {MailService} from '../src/backend/public';
 
 async function main(){
   const env=await testEnvironment();
@@ -22,6 +24,24 @@ async function main(){
       async init(){await this.call('/auth/csrf');return this;}
     }
     const guest=await new Client().init();await guest.call('/health');await guest.call('/accounting/overview?company_id='+env.demo.companies[0],undefined,401);
+    const plans=await guest.call('/public/plans');assert.equal(plans.length,5);
+    const free=plans.find((plan:any)=>plan.slug==='free'),paid=plans.find((plan:any)=>Number(plan.precio)>0);
+    const registration={nombre_completo:'Registro publico de prueba',email:'registro-publico@example.com',username:'registro_publico',password:'RegistroPublico!2026',confirm_password:'RegistroPublico!2026',pais:'El Salvador',id_plan:free.id_plan,terms:true,rol:'admin'};
+    const registered=await new Client().init();await registered.call('/auth/register',{...registration,terms:false},422);
+    const created=await registered.call('/auth/register',registration,201);assert.equal(created.redirect,'/app');assert.equal(created.user.rol,'user','El registro publico no permite elegir rol admin');
+    await registered.call('/admin/contacts',undefined,403);await registered.call('/auth/logout',{});await registered.call('/auth/me',undefined,401);
+    await registered.init();assert.equal((await registered.call('/auth/login',{username:registration.email,password:registration.password})).user.username,registration.username);await registered.call('/auth/logout',{});
+    await guest.call('/auth/register',registration,422);
+    const pendingBefore=(await env.db.rows('SELECT id FROM registros_pago_pendientes')).length;
+    await guest.call('/auth/register',{...registration,username:'registro_pago',email:'registro-pago@example.com',id_plan:paid.id_plan},503);assert.equal((await env.db.rows('SELECT id FROM registros_pago_pendientes')).length,pendingBefore,'Sin Stripe no crea registros de pago parciales');
+    await guest.call('/auth/google',{credential:'sin-configuracion'},403);
+    const contact={name:'Cliente de prueba',email:'servicios@example.com',subject:'Consulta de servicio',message:'Necesito informacion para mi negocio.'};
+    for(const service of Object.keys(contactServices) as ContactService[]){const result=await guest.call('/public/contact',{...contact,service},201);assert.equal(result.saved,true);assert.equal(result.emailSent,false);assert.equal(result.service,service);const [saved]=await env.db.rows<{asunto:string;mensaje:string}>('SELECT asunto,mensaje FROM mensajes_contacto WHERE email=? ORDER BY id DESC LIMIT 1',[contact.email]);assert.equal(saved.asunto,contactSubject(service,contact.subject));assert.equal(saved.mensaje,contact.message);}
+    await guest.call('/public/contact',contact,201);assert.equal((await env.db.rows<{asunto:string}>('SELECT asunto FROM mensajes_contacto WHERE email=? ORDER BY id DESC LIMIT 1',[contact.email]))[0].asunto,contact.subject,'Clientes anteriores siguen funcionando sin service');
+    const contactsBefore=(await env.db.rows('SELECT id FROM mensajes_contacto')).length;
+    await guest.call('/public/contact',{...contact,service:'no-definido'},422);await guest.call('/public/contact',{...contact,email:'correo-invalido'},422);await guest.call('/public/contact',{...contact,name:'   '},422);await guest.call('/public/contact',{...contact,service:'hosting',subject:'x'.repeat(contactSubjectLimit('hosting')+1)},422);assert.equal((await env.db.rows('SELECT id FROM mensajes_contacto')).length,contactsBefore,'Validacion antes de escribir');
+    await guest.call('/public/contact',{...contact,service:'dominios',subject:'x'.repeat(contactSubjectLimit('dominios'))},201);assert.equal((await env.db.rows<{asunto:string}>('SELECT asunto FROM mensajes_contacto WHERE email=? ORDER BY id DESC LIMIT 1',[contact.email]))[0].asunto.length,150);
+    const mail=env.app.get(MailService),send=mail.send;let preparedSubject='';mail.send=async(_to,subject)=>{preparedSubject=subject;};try{const sent=await guest.call('/public/contact',{...contact,service:'diseno-web'},201);assert(sent.emailSent);assert.equal(preparedSubject,'Consulta: '+contactSubject('diseno-web',contact.subject));}finally{mail.send=send;}
     const admin=await new Client().init(),user=await new Client().init();assert.equal((await admin.call('/auth/login',{username:'demo_admin',password:demoPasswords.admin})).redirect,'/admin');assert.equal((await user.call('/auth/login',{username:'demo_usuario',password:demoPasswords.user})).redirect,'/app');
     await user.call('/admin/overview',undefined,403);await user.call('/admin/users',undefined,403);await admin.call('/accounting/accounts?company_id='+env.demo.companies[0],undefined,403);
     await user.call('/dashboard');await user.call('/src/api/dashboard.php');assert.equal((await admin.call('/admin/payments')).length,1);assert.equal((await admin.call('/admin/subscriptions')).length,1);
@@ -62,7 +82,7 @@ async function main(){
     await user.call('/accounting/entries',{id_empresa:otherCompany,fecha:env.demo.date,descripcion:'Importes acumulados de alta precision',lineas:Array.from({length:49},()=>[{id_cuenta:foreignByCode['1102'],debe:'9000000000000.01',haber:'0'},{id_cuenta:foreignByCode['3101'],debe:'0',haber:'9000000000000.01'}]).flat()},201);
     const large=await user.call(`/accounting/overview?company_id=${otherCompany}&to=${env.demo.date}`);assert.equal(large.indicadores.activos,'441000000001750.49');assert.equal(large.totales.diferencia,'0.00');
     await user.call('/auth/logout',{});await user.call('/auth/me',undefined,401);
-    console.log('PASS: MySQL compartido, migraciones, seed repetible, dos logins, permisos por rol/propietario/empresa, diario exacto, anulacion, balance persistente, catalogo y libros manuales/filtros/cuota.');
+    console.log('PASS: MySQL compartido, migraciones, seed repetible, registro publico, contacto por servicio, dos logins y logout, permisos por rol/propietario/empresa, diario exacto, anulacion, balance persistente, catalogo y libros manuales/filtros/cuota.');
   }finally{await env.close();console.log('Base temporal eliminada.');}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
