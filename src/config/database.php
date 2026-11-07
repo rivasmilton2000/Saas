@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('America/El_Salvador');
 
 function databaseConfig(): array {
     $path = __DIR__ . '/db.local.php';
@@ -25,9 +26,11 @@ function databaseConnection(bool $selectDatabase = true): PDO {
     if ($selectDatabase) {
         $dsn .= ';dbname=' . $config['database'];
     }
-    return new PDO($dsn, $config['username'], $config['password'], [
+    $connection = new PDO($dsn, $config['username'], $config['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
+    $connection->exec("SET time_zone = '-06:00'");
+    return $connection;
 }

@@ -16,6 +16,9 @@ try {
         }
     }
     $pdo->query('SELECT id, username, password, rol, estado FROM usuarios LIMIT 0');
+    require_once __DIR__ . '/../src/config/db.php';
+    require_once __DIR__ . '/../src/models/UsuarioModel.php';
+    UsuarioModel::ensureSchema($pdo);
     echo "Base zentra disponible; registros existentes conservados.\n";
 } catch (Throwable $e) {
     fwrite(STDERR, "No se pudo preparar zentra: " . $e->getMessage() . "\n");

@@ -1,3 +1,3 @@
 <?php
-header('Location: src/index.php');
+header('Location: public/index.php');
 exit;

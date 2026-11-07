@@ -1,0 +1,172 @@
+# DTE Migration Notes
+
+## Alcance
+
+Se extrajo el modulo DTE desde `backup_sietelsa/dte_sietelsa` hacia `src/dte` sin modificar el backup original. La integracion se mantuvo conservadora: se reutilizo la estructura PHP existente, se aislaron rutas y sesion, y se genero un esquema PostgreSQL separado para tablas `dte_*`.
+
+## Carpetas creadas
+
+- `src/dte`
+- `src/dte/api/facturas`
+- `src/dte/api/preferencias`
+- `src/dte/config`
+- `src/dte/models`
+- `src/dte/pages`
+- `src/dte/partials`
+- `src/dte/services`
+- `database/postgresql`
+
+## Archivos copiados desde el backup
+
+Se copiaron al nuevo modulo los componentes estrictamente ligados al flujo DTE:
+
+- Configuracion: `src/dte/config/modulos.php`
+- Modelos: `EmpresaModel.php`, `FacturaDisponibleModel.php`, `FacturaModel.php`, `FacturasCuotaModel.php`, `LibroModel.php`, `UsuarioModel.php`
+- Servicios: `DteDataService.php`, `HaciendaCsvExportService.php`, `IvaWorkbookExportService.php`, `LibroExportService.php`, `LibroImportService.php`, `LibroVistaService.php`, `ModulePreferenceService.php`, `ModuloExportService.php`, `RetencionIvaService.php`, `ValidadorDTE.php`, `VentasLibroService.php`
+- APIs DTE: `src/dte/api/facturas/*.php` y `src/dte/api/preferencias/libro_columnas.php`
+- Plantillas base: `src/dte/pages/_libro_modulo_base.php`, `src/dte/pages/_ventas_modulo_base.php`
+- Footer heredado: `src/dte/partials/_footer.php`
+
+## Archivos adaptados
+
+Se ajustaron estos archivos para desacoplar SIETELSA, mover rutas a `src/dte` y soportar PostgreSQL:
+
+- `src/dte/config/app.php`
+- `src/dte/config/db.php`
+- `src/dte/config/session.php`
+- `src/dte/partials/_navbar.php`
+- `src/dte/partials/_sidebar.php`
+- `src/dte/index.php`
+- `src/dte/pages/compras.php`
+- `src/dte/pages/ventas_consumidor.php`
+- `src/dte/pages/ventas_contribuyente.php`
+- `src/dte/pages/retencion_iva.php`
+- `src/dte/pages/_libro_modulo_base.php`
+- `src/dte/pages/_ventas_modulo_base.php`
+- `src/dte/api/facturas/exportar.php`
+- `src/dte/api/facturas/importar.php`
+- `src/dte/api/facturas/importar_retencion_iva.php`
+- `src/dte/api/facturas/importar_ventas_consumidor.php`
+- `src/dte/api/facturas/importar_ventas_contribuyente.php`
+- `src/dte/api/facturas/listar.php`
+- `src/dte/api/facturas/listar_retencion_iva.php`
+- `src/dte/api/facturas/listar_ventas_consumidor.php`
+- `src/dte/api/facturas/listar_ventas_contribuyente.php`
+- `src/dte/api/preferencias/libro_columnas.php`
+- `src/dte/models/EmpresaModel.php`
+- `src/dte/models/FacturaModel.php`
+- `src/dte/models/LibroModel.php`
+- `src/dte/models/UsuarioModel.php`
+- `src/dte/services/ModulePreferenceService.php`
+- `src/config/env.php`
+
+## Punto de entrada del modulo
+
+- Entrada principal: `src/dte/index.php`
+- Libros disponibles:
+  - `src/dte/pages/compras.php`
+  - `src/dte/pages/ventas_consumidor.php`
+  - `src/dte/pages/ventas_contribuyente.php`
+  - `src/dte/pages/retencion_iva.php`
+
+## Rutas cambiadas
+
+Se reemplazaron referencias heredadas del backup para que el modulo viva bajo `src/dte`:
+
+- Rutas antiguas tipo `/admin/dte` o `app_url('src/...')` pasaron a `app_url(...)` dentro del modulo.
+- Las APIs internas ahora apuntan a `src/dte/api/...`.
+- Login, dashboard y logout se redirigen al SaaS principal con `parent_app_url(...)`.
+- El favicon ya no usa el archivo de SIETELSA y ahora reutiliza el favicon del SaaS.
+- El selector visual `data-sietelsa-theme` se renombro a `data-dte-theme`.
+
+## Conexion y sesion
+
+- `src/dte/config/db.php` primero intenta reutilizar `$pdo` del SaaS.
+- Si no existe, intenta cargar variables `DTE_DB_*` y luego `DB_*`.
+- Como ultimo respaldo, puede reutilizar `src/config/db.php`.
+- No se dejaron credenciales nuevas quemadas dentro de `src/dte`.
+- `src/dte/config/session.php` crea un puente entre la sesion principal del SaaS y `dte_usuarios` mediante `dte_user_bridge`.
+- Si un usuario del SaaS entra al modulo y aun no existe en DTE, el puente lo crea automaticamente.
+
+## Tablas migradas a PostgreSQL
+
+Se generaron solo las tablas directamente usadas por el modulo extraido:
+
+- `dte_usuarios`
+- `dte_user_bridge`
+- `dte_empresas`
+- `dte_libros`
+- `dte_facturas`
+- `dte_facturas_disponibles`
+- `dte_user_module_preferences`
+
+Archivo generado:
+
+- `database/postgresql/dte_schema.sql`
+- `database/postgresql/dte_seed.sql`
+
+## Tablas descartadas
+
+Estas tablas existen en el backup, pero no se incluyeron porque el modulo extraido no las referencia directamente:
+
+- `dte_centro_mando_avance`
+- `dte_centro_mando_config`
+- `dte_centro_mando_notas`
+- `dte_centro_mando_preferencias`
+- `dte_bitacora_movimientos`
+
+Motivo:
+
+- pertenecen al dashboard/centro de mando original de SIETELSA o a bitacora administrativa, no al flujo minimo necesario para operar los libros DTE dentro de `src/dte`.
+
+## Conversion MySQL a PostgreSQL
+
+Cambios aplicados al esquema nuevo:
+
+- se eliminaron backticks, `ENGINE`, `CHARSET` y `COLLATE`
+- `AUTO_INCREMENT` se convirtio a `GENERATED BY DEFAULT AS IDENTITY`
+- `year` se convirtio a `INTEGER` con validacion
+- `datetime` y `timestamp` se mantuvieron como `TIMESTAMP`
+- `longtext` y `text` se mantuvieron como `TEXT`
+- `tinyint(1)` se convirtio en `SMALLINT` cuando el codigo compara `0/1` explicitamente
+- `enum` se convirtio a `VARCHAR` con `CHECK`
+- `preferences_json` se migro a `JSONB`
+- los `ON UPDATE CURRENT_TIMESTAMP` se reemplazaron con triggers `BEFORE UPDATE`
+- se mantuvieron nombres `dte_*` para no romper consultas del codigo
+- no se agregaron `UNIQUE` fiscales restrictivos sobre `dte_facturas`, para preservar la logica de deteccion de duplicados existente
+
+## Cobertura funcional encontrada
+
+En la copia original si se encontraron y se conservaron:
+
+- Libro de compras
+- Libro de ventas consumidor final
+- Libro de ventas a contribuyentes
+- Retencion IVA 1%
+- Importacion JSON
+- Exportaciones Excel, CSV y PDF/HTML cuando el servicio original existe
+- Tipos DTE `01`, `03`, `05`, `06`, `14`
+
+No se encontraron como modulos o paginas separadas:
+
+- `percibido`
+- `retenido`
+- `sujeto excluido`
+
+Lo que si existe es su manejo como columnas y totales dentro de compras/ventas/exportaciones, por ejemplo `iva_percibido`, `iva_retenido` y salidas tipo libro IVA.
+
+## Riesgos o pendientes manuales
+
+- El modulo asume que el SaaS principal ya tiene la tabla `usuarios` y la sesion usa `id_usuario`, `username` y `rol`.
+- Si quieres eliminar por completo cualquier fallback legado de base de datos fuera de `src/dte`, aun conviene revisar y endurecer `src/config/db.php` antes de vender el SaaS.
+- Hay cadenas heredadas del backup que pueden requerir una revision visual de codificacion/acentos segun como responda el navegador o editor.
+- No se migraron pantallas del centro de mando ni la bitacora DTE; si luego las necesitas, habra que incorporar sus paginas y tablas omitidas.
+- El modulo reutiliza assets existentes del SaaS en `src/assets`; no se creo una carpeta `src/dte/assets` porque no era necesaria.
+- El seed se dejo vacio a proposito para no importar datos reales de SIETELSA ni correr inserciones peligrosas por defecto.
+
+## Backup original
+
+No se modifico nada dentro de:
+
+- `backup_sietelsa/dte_sietelsa`
+- `backup_sietelsa/sietelsa_backup_2026-06-27_16-11-28.sql`

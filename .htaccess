@@ -5,5 +5,8 @@ Options -Indexes
 </FilesMatch>
 
 RewriteEngine On
-RewriteRule ^(?:\.git|scripts|tests|var)(?:/|$) - [F,L,NC]
+RewriteRule ^\.env(?:\.|$) - [F,L,NC]
+RewriteRule ^(?:\.git|scripts|tests|var|backup|backup_sietelsa|database|vendor)(?:/|$) - [F,L,NC]
 RewriteRule ^src/config(?:/|$) - [F,L,NC]
+RewriteRule ^src/admin/(?:pages|partials)(?:/|$) - [F,L,NC]
+RewriteRule ^src/(?:admin|app)/routes\.php$ - [F,L,NC]

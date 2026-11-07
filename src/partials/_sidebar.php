@@ -1,103 +1,120 @@
-<nav class="sidebar sidebar-offcanvas" id="sidebar">
+<?php
+require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/../config/modulos.php';
+
+$basePath = $basePath ?? '';
+$session = $session ?? sessionData();
+$appBaseUrl = $appBaseUrl ?? saasUrl('src/app/index.php');
+$routeKey = $routeKey ?? '';
+$isAdminSidebar = function_exists('isAdmin') ? isAdmin() : (($session['rol'] ?? 'user') === 'admin');
+$modulos = array_filter(
+    getLibroModules(),
+    static fn(array $modulo): bool => ($modulo['visible_sidebar'] ?? false) === true
+);
+$moduleRoutes = [
+    'compras' => 'dte.purchases',
+    'ventas_consumidor' => 'dte.consumer-sales',
+    'ventas_contribuyente' => 'dte.taxpayer-sales',
+    'retencion_iva' => 'dte.vat-withholdings',
+];
+$currentPath = str_replace('\\', '/', (string) ($_SERVER['PHP_SELF'] ?? ''));
+$currentPage = basename($currentPath);
+$isDashboard = $routeKey === 'dashboard' || ($routeKey === '' && $currentPage === 'index.php');
+$isBitacora  = $currentPage === 'bitacora.php';
+$isBackups   = $currentPage === 'backups.php';
+?>
+<style>
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link {
+    background: transparent;
+    color: #6C7383;
+  }
+
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item.active,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item.active > .nav-link,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link.active {
+    background: transparent;
+    color: #6C7383;
+  }
+
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link .menu-icon,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item.active > .nav-link .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item.active > .nav-link .menu-icon,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link.active .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link.active .menu-icon {
+    color: #6C7383;
+  }
+
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item:hover > .nav-link,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:hover,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:focus {
+    background: #4B49AC;
+    color: #ffffff;
+  }
+
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item:hover > .nav-link .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item:hover > .nav-link .menu-icon,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:hover .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:hover .menu-icon,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:focus .menu-title,
+  .shared-sidebar .nav:not(.sub-menu) > .nav-item > .nav-link:focus .menu-icon {
+    color: #ffffff;
+  }
+</style>
+<nav class="sidebar sidebar-offcanvas shared-sidebar" id="sidebar">
   <ul class="nav">
+    <?php if ($isAdminSidebar): ?>
     <li class="nav-item">
-      <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/index.php')); ?>">
+      <a class="nav-link" href="<?php echo htmlspecialchars(saasUrl('src/admin/index.php')); ?>" <?php echo $isDashboard ? 'aria-current="page"' : ''; ?>>
         <i class="icon-grid menu-icon"></i>
-        <span class="menu-title">Dashboard</span>
+        <span class="menu-title">Panel admin</span>
       </a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#ui-basic" aria-expanded="false" aria-controls="ui-basic">
-        <i class="icon-layout menu-icon"></i>
-        <span class="menu-title">UI Elements</span>
-        <i class="menu-arrow"></i>
+      <a class="nav-link" href="<?php echo htmlspecialchars(saasUrl('src/admin/index.php?page=audit')); ?>" <?php echo $isBitacora ? 'aria-current="page"' : ''; ?>>
+        <i class="mdi mdi-history menu-icon"></i>
+        <span class="menu-title">Bitacora</span>
       </a>
-      <div class="collapse" id="ui-basic">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/buttons.php')); ?>">Buttons</a></li>
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/dropdowns.php')); ?>">Dropdowns</a></li>
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/ui-features/typography.php')); ?>">Typography</a></li>
-        </ul>
-      </div>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#form-elements" aria-expanded="false" aria-controls="form-elements">
-        <i class="icon-columns menu-icon"></i>
-        <span class="menu-title">Form elements</span>
-        <i class="menu-arrow"></i>
+      <a class="nav-link" href="<?php echo htmlspecialchars(saasUrl('src/admin/index.php?page=backups')); ?>" <?php echo $isBackups ? 'aria-current="page"' : ''; ?>>
+        <i class="mdi mdi-database-lock-outline menu-icon"></i>
+        <span class="menu-title">Backups</span>
       </a>
-      <div class="collapse" id="form-elements">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"><a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/forms/basic_elements.php')); ?>">Basic Elements</a></li>
-        </ul>
-      </div>
+    </li>
+    <?php else: ?>
+    <li class="nav-item">
+      <a class="nav-link" href="<?php echo htmlspecialchars($appBaseUrl); ?>" <?php echo $isDashboard ? 'aria-current="page"' : ''; ?>>
+        <i class="mdi mdi-view-dashboard-outline menu-icon"></i>
+        <span class="menu-title">Inicio</span>
+      </a>
+    </li>
+    <?php foreach ($modulos as $moduleKey => $modulo): ?>
+    <?php
+      $moduleRoute = $moduleRoutes[$moduleKey] ?? '';
+      $moduleUrl = $moduleRoute !== ''
+          ? $appBaseUrl . '?page=' . rawurlencode($moduleRoute)
+          : saasUrl('src/' . ltrim((string) ($modulo['ruta'] ?? ''), '/'));
+      $esActivo = $routeKey === $moduleRoute;
+    ?>
+    <li class="nav-item">
+      <a class="nav-link" href="<?php echo htmlspecialchars($moduleUrl); ?>" <?php echo $esActivo ? 'aria-current="page"' : ''; ?>>
+        <i class="<?php echo htmlspecialchars((string) ($modulo['icono'] ?? 'icon-layout')); ?> menu-icon"></i>
+        <span class="menu-title"><?php echo htmlspecialchars((string) $modulo['nombre']); ?></span>
+      </a>
+    </li>
+    <?php endforeach; ?>
+    <?php endif; ?>
+    <li class="nav-item">
+      <a class="nav-link" href="<?php echo htmlspecialchars(saasPublicUrl('index.php')); ?>">
+        <i class="icon-arrow-left-circle menu-icon"></i>
+        <span class="menu-title">Volver al sitio</span>
+      </a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#charts" aria-expanded="false" aria-controls="charts">
-        <i class="icon-bar-graph menu-icon"></i>
-        <span class="menu-title">Charts</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse" id="charts">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/charts/chartjs.php')); ?>">ChartJs</a></li>
-        </ul>
-      </div>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#tables" aria-expanded="false" aria-controls="tables">
-        <i class="icon-grid-2 menu-icon"></i>
-        <span class="menu-title">Tables</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse" id="tables">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/tables/basic-table.php')); ?>">Basic table</a></li>
-        </ul>
-      </div>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#icons" aria-expanded="false" aria-controls="icons">
-        <i class="icon-contract menu-icon"></i>
-        <span class="menu-title">Icons</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse" id="icons">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/icons/mdi.php')); ?>">Mdi icons</a></li>
-        </ul>
-      </div>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#auth" aria-expanded="false" aria-controls="auth">
-        <i class="icon-head menu-icon"></i>
-        <span class="menu-title">User Pages</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse" id="auth">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/login.php')); ?>"> Login </a></li>
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/register.php')); ?>"> Register </a></li>
-        </ul>
-      </div>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#error" aria-expanded="false" aria-controls="error">
-        <i class="icon-ban menu-icon"></i>
-        <span class="menu-title">Error pages</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse" id="error">
-        <ul class="nav flex-column sub-menu">
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/error-404.php')); ?>"> 404 </a></li>
-          <li class="nav-item"> <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/pages/samples/error-500.php')); ?>"> 500 </a></li>
-        </ul>
-      </div>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" href="<?php echo htmlspecialchars(appUrl('src/docs/documentation.html')); ?>">
-        <i class="icon-paper menu-icon"></i>
-        <span class="menu-title">Documentation</span>
+      <a class="nav-link" href="<?php echo htmlspecialchars(saasUrl('src/pages/samples/logout.php')); ?>">
+        <i class="icon-power menu-icon"></i>
+        <span class="menu-title">Cerrar sesion</span>
       </a>
     </li>
   </ul>

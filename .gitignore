@@ -1,3 +1,4 @@
+/.env
 /src/config/db.local.php
 /node_modules/
 /var/
