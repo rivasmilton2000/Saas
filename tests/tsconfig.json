@@ -1,0 +1,5 @@
+{
+  "extends": "../src/backend/tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": ".." },
+  "include": ["./**/*.ts", "../scripts/**/*.ts"]
+}

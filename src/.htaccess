@@ -5,8 +5,9 @@ Options -Indexes
 </FilesMatch>
 
 RewriteEngine On
-RewriteRule ^\.env(?:\.|$) - [F,L,NC]
-RewriteRule ^(?:\.git|scripts|tests|var|backup|backup_sietelsa|database|vendor)(?:/|$) - [F,L,NC]
-RewriteRule ^src/config(?:/|$) - [F,L,NC]
-RewriteRule ^src/admin/(?:pages|partials)(?:/|$) - [F,L,NC]
-RewriteRule ^src/(?:admin|app)/routes\.php$ - [F,L,NC]
+RewriteRule (^|/)\. - [F,L,NC]
+RewriteRule ^(?:scripts|tests|var|backup|backup_sietelsa|database|vendor|config|models|controllers|services|includes|backend|frontend)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:admin|app)/routes\.php$ - [F,L,NC]
+# Este contexto de Apache reemplaza reglas del padre. Enviar tambien las rutas
+# existentes al unico punto de entrada; no ejecutar los controladores PHP antiguos.
+RewriteRule ^ ../index.php [END]

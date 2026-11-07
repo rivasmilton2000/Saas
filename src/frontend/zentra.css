@@ -1,0 +1,14 @@
+/* Complementos de interaccion; colores, tipografia y secciones vienen del tema Zentra. */
+.zentra-nav{position:absolute!important;top:0;width:100%;z-index:100}
+.zentra-menu{border:0;background:transparent;color:#1d293e;font-size:28px;padding:12px}
+.zentra-menu-links ul{margin-bottom:0}
+.zentra-account{max-width:760px;margin:12vh auto;padding:32px;background:#fff;border-radius:24px}
+.zentra-account h1{margin-top:32px}
+.zentra-account button{max-width:260px}
+.auth-form .auth-submit{margin-top:20px}
+.auth-switch{margin-top:24px;text-align:center}
+.auth-alert{padding:14px 18px;border:1px solid #d9d4ee;border-radius:12px;margin:16px 0;color:#30244d;background:#f7f5ff}
+.auth-field select.auth-input{width:100%}
+.pricing_card button.btn_pricing{cursor:pointer}
+.section-top{background-color:#28233f}
+@media(max-width:1199px){.zentra-menu-links{display:none;background:#fff;padding:16px!important}.zentra-menu-links.is-open{display:block}.zentra-menu-links .site-menu li{display:block!important;text-align:left}.zentra-menu-links .site-menu a{color:#25213b!important}}

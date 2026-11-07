@@ -1,0 +1,9 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(?:conexion|vendor|scripts|tests|docs|build/backend)(?:/|$) - [F,L,NC]
+RewriteRule \.(?:env|sql|md|log|ini|bak|dump|ts|tsx|json|lock|phar)$ - [F,L,NC]
+RewriteRule ^index\.php$ - [L]
+# Apache conserva la URL antigua; index.php la lleva al servidor Nest ya verificado.
+RewriteRule ^ index.php [END]

@@ -1,0 +1,14 @@
+node_modules/
+/build/
+/.env
+/.env.*
+!/.env.example
+!/.env.demo.example
+/src/config/db.local.php
+/conexion/db.local.php
+/src/var/
+/test-results/
+/.runtime/
+/playwright-report/
+*.tsbuildinfo
+*.local.sql

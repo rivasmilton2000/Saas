@@ -1,16 +1,8 @@
 <?php
 declare(strict_types=1);
 
-const MYSQL_DSN = 'mysql:host=localhost;dbname=saas_contabilidad;charset=utf8mb4';
-const MYSQL_USER = 'root';
-const MYSQL_PASS = '';
+require_once dirname(__DIR__, 2) . '/conexion/legacy-export-connection.php';
 
-const POSTGRES_HOST = 'localhost';
-const POSTGRES_PORT = '5432';
-const POSTGRES_ADMIN_DB = 'postgres';
-const POSTGRES_TARGET_DB = 'Saas';
-const POSTGRES_USER = 'postgres';
-const POSTGRES_PASS = '1581';
 
 const TABLE_ORDER = [
     'usuarios',
@@ -87,14 +79,6 @@ function main(array $argv): void {
     $postgresTarget->exec($seedSql);
 
     echo 'Migracion aplicada en PostgreSQL: ' . POSTGRES_TARGET_DB . PHP_EOL;
-}
-
-function createPdo(string $dsn, string $user, string $pass): PDO {
-    return new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
 }
 
 function ensureDatabase(PDO $pdo, string $databaseName): void {

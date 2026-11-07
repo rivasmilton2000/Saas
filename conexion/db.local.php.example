@@ -1,5 +1,5 @@
 <?php
-// Copiar a db.local.php (ignorado por Git). Usar las credenciales reales de XAMPP.
+// Referencia PHP anterior. La aplicacion activa usa las variables DB_* de /.env.
 return [
     'host' => '127.0.0.1',
     'port' => 3306,
