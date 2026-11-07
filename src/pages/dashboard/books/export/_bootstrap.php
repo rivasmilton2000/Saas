@@ -1,0 +1,3 @@
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__,4).'/includes/dashboard/modules.php';require_once SIETELSA_ROOT.'/includes/exports/bootstrap.php';require_authentication();$moduleMap=['compras'=>'book_purchases','ventas_consumidor'=>'book_consumer_sales','ventas_contribuyente'=>'book_taxpayer_sales','retencion_iva'=>'book_vat_withholding'];$accountingModule=(string)($_REQUEST['module']??'');if(!isset($moduleMap[$accountingModule]))sietelsa_abort(422,'',new InvalidArgumentException('Módulo contable inválido.'));$currentUser=require_dashboard_module($moduleMap[$accountingModule]);CompanyPermissionService::require($currentUser,'book.export');$companyContextUser=company_context_user($currentUser);[$exportService,$exportStorage]=accounting_export_services();

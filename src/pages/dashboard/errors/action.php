@@ -1,0 +1,3 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/_bootstrap.php';if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sietelsa_abort(405);if(!csrf_is_valid((string)($_POST['csrf_token']??'')))sietelsa_abort(419);$id=(string)($_POST['id']??'');if(!preg_match('/^[a-f0-9-]{36}$/i',$id))sietelsa_abort(422,'',new InvalidArgumentException('Identificador de incidente inválido.'),['module'=>'errors','action'=>'update']);$errorIncidentService->update($id,(string)($_POST['status']??''),(string)($_POST['note']??''),(int)$currentUser['id']);auth_audit('incidente_error_actualizado',(int)$currentUser['id'],'session',null,['incident_id'=>$id,'status'=>(string)$_POST['status']]);header('Location: '.app_url('src/dashboard/errors/view.php').'?id='.rawurlencode($id));exit;

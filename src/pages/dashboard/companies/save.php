@@ -1,0 +1,6 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/_bootstrap.php';if(($_SERVER['REQUEST_METHOD']??'')!=='POST')sietelsa_abort(405);if(!csrf_is_valid((string)($_POST['csrf_token']??'')))sietelsa_abort(419);$id=max(0,(int)($_POST['id']??0));$_SESSION['company_old']=$_POST;$logo=null;$logoManager=new CompanyLogoManager();
+try{$companyService->validateInput($_POST);if(isset($_FILES['logo'])&&(int)($_FILES['logo']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)$logo=$logoManager->store($_FILES['logo']);if($id){$companyService->update($id,$_POST,$currentUser,$companyContextUser,$logo);flash_set('success','Empresa actualizada','Los cambios se guardaron con trazabilidad.');}else{$id=$companyService->create($_POST,$currentUser,$companyContextUser,$logo);flash_set('success','Empresa creada','La empresa ya está disponible para activarla y trabajar sus libros.');}unset($_SESSION['company_old']);header('Location: '.app_url('src/dashboard/companies/index.php'));exit;}
+catch(InvalidArgumentException|DomainException $e){if($logo)$logoManager->delete($logo['path']);flash_set('error','No fue posible guardar',$e->getMessage());header('Location: '.app_url('src/dashboard/companies/form.php').($id?'?id='.$id:''));exit;}
+catch(Throwable $e){if($logo)$logoManager->delete($logo['path']);throw $e;}

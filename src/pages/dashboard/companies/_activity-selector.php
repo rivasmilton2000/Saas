@@ -1,0 +1,8 @@
+<?php if(!defined('SIETELSA_DASHBOARD_RENDER')){http_response_code(404);exit;} ?>
+<div class="col-12" data-activity-picker data-url="<?= e(app_url('src/dashboard/companies/activities.php')) ?>">
+ <label class="form-label" for="activity-code-search">Actividad económica específica</label>
+ <div class="row g-2"><div class="col-md-5"><select class="form-select" data-activity-section aria-label="Categoría general"><option value="">Todas las categorías</option><?php foreach(EconomicActivityCatalog::SECTIONS as $code=>$label): ?><option value="<?= e($code) ?>"><?= e($code.' · '.$label) ?></option><?php endforeach; ?><option value="other">Otras actividades del catálogo oficial</option></select></div>
+ <div class="col-md-7 position-relative"><div class="input-group"><input class="form-control" id="activity-code-search" data-activity-search autocomplete="off" placeholder="Buscar código o descripción" value="<?= e(trim((string)($data['actividad_economica_codigo']??'').' '.(string)($data['actividad_economica']??''))) ?>"><button class="btn btn-outline-secondary" type="button" data-activity-clear aria-label="Limpiar actividad">×</button></div><div class="dropdown-menu w-100" style="max-height:240px;overflow-y:auto" data-activity-options role="listbox"></div></div></div>
+ <input type="hidden" name="<?= e($activityCodeName??'actividad_economica_codigo') ?>" value="<?= e((string)($data['actividad_economica_codigo']??'')) ?>" data-activity-code><input type="hidden" name="<?= e($activityDescriptionName??'actividad_economica') ?>" value="<?= e((string)($data['actividad_economica']??'')) ?>" data-activity-description>
+ <div class="form-text">Elige la actividad que consta en el registro del contribuyente. Las categorías A–U solo organizan la búsqueda.</div>
+</div>
